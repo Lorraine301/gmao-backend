@@ -23,24 +23,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
 
-    @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
-            throws ServletException, IOException {
+@Override
+protected void doFilterInternal(HttpServletRequest request,
+                                HttpServletResponse response,
+                                FilterChain filterChain)
+        throws ServletException, IOException {
 
-        final String authHeader = request.getHeader("Authorization");
+    final String authHeader = request.getHeader("Authorization");
 
-        // Pas de token → on laisse passer (la route sera bloquée par SecurityFilterChain si protégée)
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        filterChain.doFilter(request, response);
+        return;
+    }
 
-        final String jwt = authHeader.substring(7);
+    final String jwt = authHeader.substring(7);
+
+    try {
         final String userEmail = jwtService.extractUsername(jwt);
 
-        // Token présent mais pas encore authentifié dans le contexte
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
 
@@ -52,7 +52,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
-
-        filterChain.doFilter(request, response);
+    } catch (Exception e) {
+        // Token malformé, expiré ou signature invalide → on laisse passer
+        // Spring Security bloquera avec 401 via le authenticationEntryPoint
+        SecurityContextHolder.clearContext();
     }
+
+    filterChain.doFilter(request, response);
+  }
 }

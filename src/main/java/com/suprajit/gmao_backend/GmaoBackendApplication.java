@@ -36,7 +36,10 @@ public class GmaoBackendApplication {
 
             // Insérer un admin de test si aucun utilisateur en base
             if (userRepository.count() == 0) {
-                Role adminRole = roleRepository.findByName("Admin").orElseThrow();
+                Role adminRole       = roleRepository.findByName("Admin").orElseThrow();
+                Role supervisorRole  = roleRepository.findByName("Supervisor").orElseThrow();
+                Role technicianRole  = roleRepository.findByName("Technician").orElseThrow();
+
                 userRepository.save(User.builder()
                         .fullName("Admin Suprajit")
                         .email("admin@suprajit.ma")
@@ -44,7 +47,25 @@ public class GmaoBackendApplication {
                         .role(adminRole)
                         .availabilityStatus("Available")
                         .build());
-                System.out.println("[INIT] Utilisateur admin créé : admin@suprajit.ma / admin123");
+
+                userRepository.save(User.builder()
+                        .fullName("Supervisor Suprajit")
+                        .email("supervisor@suprajit.ma")
+                        .password(passwordEncoder.encode("supervisor123"))
+                        .role(supervisorRole)
+                        .availabilityStatus("Available")
+                        .build());
+
+                userRepository.save(User.builder()
+                        .fullName("Technicien Suprajit")
+                        .email("technician@suprajit.ma")
+                        .password(passwordEncoder.encode("tech123"))
+                        .role(technicianRole)
+                        .speciality("Électromécanique")
+                        .availabilityStatus("Available")
+                        .build());
+
+                System.out.println("[INIT] 3 utilisateurs de test créés");
             }
         };
     }

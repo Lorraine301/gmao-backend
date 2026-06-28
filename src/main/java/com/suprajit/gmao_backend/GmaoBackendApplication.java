@@ -41,6 +41,7 @@ public class GmaoBackendApplication {
                 Role technicianRole  = roleRepository.findByName("Technician").orElseThrow();
 
                 userRepository.save(User.builder()
+                        .employeeCode("1001")
                         .fullName("Admin Suprajit")
                         .email("admin@suprajit.ma")
                         .password(passwordEncoder.encode("admin123"))
@@ -49,6 +50,7 @@ public class GmaoBackendApplication {
                         .build());
 
                 userRepository.save(User.builder()
+                        .employeeCode("1247")
                         .fullName("Supervisor Suprajit")
                         .email("supervisor@suprajit.ma")
                         .password(passwordEncoder.encode("supervisor123"))
@@ -57,6 +59,7 @@ public class GmaoBackendApplication {
                         .build());
 
                 userRepository.save(User.builder()
+                        .employeeCode("317")
                         .fullName("Technicien Suprajit")
                         .email("technician@suprajit.ma")
                         .password(passwordEncoder.encode("tech123"))

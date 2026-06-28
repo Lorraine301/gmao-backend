@@ -19,6 +19,9 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "employee_code", unique = true, length = 10)
+    private String employeeCode;   // ex: 317, 1247, 255
+
     @Column(name = "full_name", nullable = false, length = 100)
     private String fullName;
 

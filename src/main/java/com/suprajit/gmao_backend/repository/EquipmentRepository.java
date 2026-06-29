@@ -12,17 +12,20 @@ import com.suprajit.gmao_backend.entity.enums.EquipmentStatus;
 public interface EquipmentRepository extends JpaRepository<Equipment, Long> {
 
     Optional<Equipment> findByCode(String code);
+    boolean existsByCode(String code);
 
+    // Filtres simples
     List<Equipment> findByStatus(EquipmentStatus status);
-
     List<Equipment> findByType(String type);
-
     List<Equipment> findByCriticalityLevel(CriticalityLevel criticalityLevel);
 
+    // Filtres combinés
     List<Equipment> findByStatusAndCriticalityLevel(
-        EquipmentStatus status,
-        CriticalityLevel criticalityLevel
-    );
+        EquipmentStatus status, CriticalityLevel criticalityLevel);
 
-    boolean existsByCode(String code);
+    List<Equipment> findByStatusAndType(
+        EquipmentStatus status, String type);
+
+    List<Equipment> findByStatusAndTypeAndCriticalityLevel(
+        EquipmentStatus status, String type, CriticalityLevel criticalityLevel);
 }

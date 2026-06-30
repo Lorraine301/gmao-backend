@@ -1,5 +1,6 @@
 package com.suprajit.gmao_backend.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,4 +28,12 @@ public interface FailureRepository extends JpaRepository<Failure, Long> {
         @Param("equipmentId") Long equipmentId);
 
     long countByFailureCodeStartingWith(String prefix);
+    @Query("SELECT f FROM Failure f WHERE f.equipment.id = :equipmentId " +
+        "AND f.reportedAt >= :since")
+    List<Failure> findRecentByEquipment(
+        @Param("equipmentId") Long equipmentId,
+        @Param("since") LocalDateTime since);
+
+    @Query("SELECT f FROM Failure f WHERE f.priority = 'Critical' AND f.status != 'Closed'")
+    List<Failure> findUrgent();
 }

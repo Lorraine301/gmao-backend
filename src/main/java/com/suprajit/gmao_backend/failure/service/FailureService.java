@@ -17,6 +17,7 @@ import com.suprajit.gmao_backend.failure.dto.FailureResponseDTO;
 import com.suprajit.gmao_backend.repository.EquipmentRepository;
 import com.suprajit.gmao_backend.repository.FailureRepository;
 import com.suprajit.gmao_backend.repository.UserRepository;
+import com.suprajit.gmao_backend.ruleengine.service.RuleEngineService;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class FailureService {
     private final FailureRepository failureRepository;
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
+    private final RuleEngineService ruleEngineService;
 
     // ── Mapper entité → DTO (résout équipement + déclarant) ──
     private FailureResponseDTO toDTO(Failure f) {
@@ -93,7 +95,19 @@ public class FailureService {
                 .llmProcessed(false)
                 .build();
 
-        return toDTO(failureRepository.save(failure));
+        Failure saved = failureRepository.save(failure);
+
+        // ── Évaluation par le Rule Engine ──────────────────────
+        var ruleResult = ruleEngineService.evaluateFailure(saved);
+        saved.setPriority(ruleResult.getComputedPriority());
+        saved = failureRepository.save(saved);
+
+        if (!ruleResult.getTriggeredRules().isEmpty()) {
+            System.out.println("[RULE ENGINE] Panne " + saved.getFailureCode() + " :");
+            ruleResult.getTriggeredRules().forEach(r -> System.out.println("  → " + r));
+        }
+
+        return toDTO(saved);
     }
 
     // ── READ ALL avec filtres ─────────────────────────────────
@@ -132,4 +146,10 @@ public class FailureService {
         failure.setPriority(newPriority);
         return toDTO(failureRepository.save(failure));
     }
+    // ── READ URGENT (Critical + non clôturées) ─────────────────────
+    public List<FailureResponseDTO> findUrgent() {
+    return failureRepository.findUrgent()
+            .stream().map(this::toDTO).toList();
+    }
+
 }

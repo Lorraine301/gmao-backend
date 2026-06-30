@@ -79,28 +79,15 @@ public class EquipmentService {
     public List<EquipmentResponseDTO> findAll(
             EquipmentStatus status,
             String type,
-            CriticalityLevel criticality) {
+            CriticalityLevel criticality,
+            String search) {
 
-        List<Equipment> equipments;
+        // Normaliser les valeurs vides
+        String searchParam = (search != null && !search.isBlank()) ? search.trim() : null;
+        String typeParam = (type != null && !type.isBlank()) ? type : null;
 
-        if (status != null && type != null && criticality != null) {
-            equipments = equipmentRepository
-                .findByStatusAndTypeAndCriticalityLevel(status, type, criticality);
-        } else if (status != null && criticality != null) {
-            equipments = equipmentRepository
-                .findByStatusAndCriticalityLevel(status, criticality);
-        } else if (status != null && type != null) {
-            equipments = equipmentRepository
-                .findByStatusAndType(status, type);
-        } else if (status != null) {
-            equipments = equipmentRepository.findByStatus(status);
-        } else if (type != null) {
-            equipments = equipmentRepository.findByType(type);
-        } else if (criticality != null) {
-            equipments = equipmentRepository.findByCriticalityLevel(criticality);
-        } else {
-            equipments = equipmentRepository.findAll();
-        }
+        List<Equipment> equipments = equipmentRepository
+            .findWithFilters(status, typeParam, criticality, searchParam);
 
         return equipments.stream().map(this::toDTO).toList();
     }

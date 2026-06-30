@@ -75,9 +75,11 @@ public class EquipmentController {
             @RequestParam(required = false) String type,
 
             @Parameter(description = "Filtrer par criticité (Low, Medium, High)")
-            @RequestParam(required = false) CriticalityLevel criticality) {
+            @RequestParam(name = "criticality",required = false) CriticalityLevel criticality,
+            @Parameter(description = "Recherche textuelle")
+            @RequestParam(required = false) String search) {
 
-        return ResponseEntity.ok(equipmentService.findAll(status, type, criticality));
+        return ResponseEntity.ok(equipmentService.findAll(status, type, criticality, search));
     }
 
     // ── GET /api/equipments/{id} ────────────────────────────

@@ -55,9 +55,18 @@ public class FailureService {
                 .reportedAt(f.getReportedAt())
                 .resolvedAt(f.getResolvedAt())
                 .llmProcessed(f.getLlmProcessed())
+                .ruleEngineTriggered(f.getRuleEngineTriggered())
+                        .recommendedTechnicianId(f.getRecommendedTechnicianId())
+                        .recommendedTechnicianName(
+                            f.getRecommendedTechnicianId() != null
+                                ? userRepository.findById(f.getRecommendedTechnicianId())
+                                    .map(User::getFullName).orElse(null)
+                                : null
+                        )         
                 .createdAt(f.getCreatedAt())
                 .updatedAt(f.getUpdatedAt())
                 .build();
+                
     }
 
     // ── Génère le prochain code panne (FAIL-0001, FAIL-0002...) ──
@@ -100,6 +109,11 @@ public class FailureService {
         // ── Évaluation par le Rule Engine ──────────────────────
         var ruleResult = ruleEngineService.evaluateFailure(saved);
         saved.setPriority(ruleResult.getComputedPriority());
+
+        // ← Stocker si une règle a été déclenchée
+        saved.setRuleEngineTriggered(!ruleResult.getTriggeredRules().isEmpty());
+        saved.setRecommendedTechnicianId(ruleResult.getRecommendedTechnicianId());
+        
         saved = failureRepository.save(saved);
 
         if (!ruleResult.getTriggeredRules().isEmpty()) {

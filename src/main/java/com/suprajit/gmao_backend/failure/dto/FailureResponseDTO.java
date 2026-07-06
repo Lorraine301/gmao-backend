@@ -39,4 +39,9 @@ public class FailureResponseDTO {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Rule engine
+    private Boolean ruleEngineTriggered;
+    private Long recommendedTechnicianId;
+    private String recommendedTechnicianName;
 }

@@ -34,56 +34,72 @@ public class GmaoBackendApplication {
 
     @Bean
     CommandLineRunner initRoles(RoleRepository roleRepository,
-                                UserRepository userRepository,
-                                PasswordEncoder passwordEncoder) {
-        return args -> {
-            // Initialiser les rôles
-            List<String> roles = List.of("Admin", "Supervisor", "Technician");
-            for (String roleName : roles) {
-                if (roleRepository.findByName(roleName).isEmpty()) {
-                    roleRepository.save(Role.builder().name(roleName).build());
-                    System.out.println("[INIT] Rôle créé : " + roleName);
-                }
+                            UserRepository userRepository,
+                            PasswordEncoder passwordEncoder) {
+    return args -> {
+        List<String> roles = List.of("Admin", "Supervisor", "Technician");
+        for (String roleName : roles) {
+            if (roleRepository.findByName(roleName).isEmpty()) {
+                roleRepository.save(Role.builder().name(roleName).build());
+                System.out.println("[INIT] Rôle créé : " + roleName);
             }
+        }
 
-            // Insérer un admin de test si aucun utilisateur en base
-            if (userRepository.count() == 0) {
-                Role adminRole       = roleRepository.findByName("Admin").orElseThrow();
-                Role supervisorRole  = roleRepository.findByName("Supervisor").orElseThrow();
-                Role technicianRole  = roleRepository.findByName("Technician").orElseThrow();
+        if (userRepository.count() == 0) {
+            Role adminRole      = roleRepository.findByName("Admin").orElseThrow();
+            Role supervisorRole = roleRepository.findByName("Supervisor").orElseThrow();
+            Role technicianRole = roleRepository.findByName("Technician").orElseThrow();
 
-                userRepository.save(User.builder()
-                        .employeeCode("1001")
-                        .fullName("Admin Suprajit")
-                        .email("admin@suprajit.ma")
-                        .password(passwordEncoder.encode("admin123"))
-                        .role(adminRole)
-                        .availabilityStatus("Available")
-                        .build());
+            userRepository.save(User.builder()
+                    .employeeCode("1001").fullName("Admin Suprajit")
+                    .email("admin@suprajit.ma").password(passwordEncoder.encode("admin123"))
+                    .role(adminRole).availabilityStatus("Available").build());
 
-                userRepository.save(User.builder()
-                        .employeeCode("1247")
-                        .fullName("Supervisor Suprajit")
-                        .email("supervisor@suprajit.ma")
-                        .password(passwordEncoder.encode("supervisor123"))
-                        .role(supervisorRole)
-                        .availabilityStatus("Available")
-                        .build());
+            userRepository.save(User.builder()
+                    .employeeCode("1247").fullName("Supervisor Suprajit")
+                    .email("supervisor@suprajit.ma").password(passwordEncoder.encode("supervisor123"))
+                    .role(supervisorRole).availabilityStatus("Available").build());
 
-                userRepository.save(User.builder()
-                        .employeeCode("317")
-                        .fullName("Technicien Suprajit")
-                        .email("technician@suprajit.ma")
-                        .password(passwordEncoder.encode("tech123"))
-                        .role(technicianRole)
-                        .speciality("Électromécanique")
-                        .availabilityStatus("Available")
-                        .build());
+            userRepository.save(User.builder()
+                    .employeeCode("317").fullName("Technicien Suprajit")
+                    .email("technician@suprajit.ma").password(passwordEncoder.encode("tech123"))
+                    .role(technicianRole).speciality("Électromécanique")
+                    .availabilityStatus("Available").build());
 
-                System.out.println("[INIT] 3 utilisateurs de test créés");
-            }
-        };
-    }
+            System.out.println("[INIT] 3 utilisateurs de base créés");
+        }
+
+        // ── Techniciens supplémentaires (insérés si absents par email) ──
+        Role technicianRole = roleRepository.findByName("Technician").orElseThrow();
+
+        if (userRepository.findByEmail("m.alami@suprajit.ma").isEmpty()) {
+            userRepository.save(User.builder()
+                    .employeeCode("422").fullName("Mohamed Alami")
+                    .email("m.alami@suprajit.ma").password(passwordEncoder.encode("tech123"))
+                    .role(technicianRole).speciality("Mécanique")
+                    .availabilityStatus("Available").build());
+            System.out.println("[INIT] Technicien ajouté : Mohamed Alami");
+        }
+
+        if (userRepository.findByEmail("y.benali@suprajit.ma").isEmpty()) {
+            userRepository.save(User.builder()
+                    .employeeCode("588").fullName("Youssef Benali")
+                    .email("y.benali@suprajit.ma").password(passwordEncoder.encode("tech123"))
+                    .role(technicianRole).speciality("Électrique")
+                    .availabilityStatus("Available").build());
+            System.out.println("[INIT] Technicien ajouté : Youssef Benali");
+        }
+
+        if (userRepository.findByEmail("f.mansouri@suprajit.ma").isEmpty()) {
+            userRepository.save(User.builder()
+                    .employeeCode("731").fullName("Fatima Zahra Mansouri")
+                    .email("f.mansouri@suprajit.ma").password(passwordEncoder.encode("tech123"))
+                    .role(technicianRole).speciality("Électromécanique")
+                    .availabilityStatus("Available").build());
+            System.out.println("[INIT] Technicien ajouté : Fatima Zahra Mansouri");
+        }
+    };
+}
     @Bean
     CommandLineRunner initEquipments(EquipmentRepository equipmentRepository) {
         return args -> {

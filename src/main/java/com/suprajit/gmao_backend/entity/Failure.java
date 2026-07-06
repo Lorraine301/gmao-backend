@@ -1,15 +1,32 @@
 package com.suprajit.gmao_backend.entity;
 
-import com.suprajit.gmao_backend.entity.enums.FailurePriority;
-import com.suprajit.gmao_backend.entity.enums.FailureStatus;
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import com.suprajit.gmao_backend.entity.enums.FailurePriority;
+import com.suprajit.gmao_backend.entity.enums.FailureStatus;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "failures")
@@ -85,4 +102,13 @@ public class Failure {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // Règles declencheées
+    @Column(name = "rule_engine_triggered")
+    @Builder.Default
+    private Boolean ruleEngineTriggered = false;
+
+    @Column(name = "recommended_technician_id")
+    private Long recommendedTechnicianId;
+
 }

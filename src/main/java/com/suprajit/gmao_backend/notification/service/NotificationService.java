@@ -1,15 +1,20 @@
 package com.suprajit.gmao_backend.notification.service;
 
-import com.suprajit.gmao_backend.entity.Notification;
-import com.suprajit.gmao_backend.entity.User;
-import com.suprajit.gmao_backend.repository.NotificationRepository;
-import com.suprajit.gmao_backend.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import com.suprajit.gmao_backend.entity.Notification;
+import com.suprajit.gmao_backend.entity.User;
+import com.suprajit.gmao_backend.notification.dto.NotificationResponseDTO;
+import com.suprajit.gmao_backend.repository.NotificationRepository;
+import com.suprajit.gmao_backend.repository.UserRepository;
+
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +23,22 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+
+    // ── Mapper ──────────────────────────────────────────────
+    private NotificationResponseDTO toDTO(Notification n) {
+        return NotificationResponseDTO.builder()
+                .id(n.getId())
+                .userId(n.getUser().getId())
+                .userFullName(n.getUser().getFullName())
+                .type(n.getType())
+                .message(n.getMessage())
+                .entityType(n.getEntityType())
+                .entityId(n.getEntityId())
+                .status(n.getStatus())
+                .notificationDate(n.getNotificationDate())
+                .createdAt(n.getCreatedAt())
+                .build();
+    }
 
     // ── Créer une notification pour un utilisateur ──────────
     public void create(Long userId, String type, String message,
@@ -52,5 +73,48 @@ public class NotificationService {
                     .notificationDate(LocalDateTime.now())
                     .build());
         }
+    }
+
+    // ── Notifications de l'utilisateur connecté ──────────────
+    public List<NotificationResponseDTO> findForCurrentUser() {
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Utilisateur non trouvé"));
+
+        return notificationRepository
+                .findByUserIdOrderByCreatedAtDesc(user.getId())
+                .stream().map(this::toDTO).toList();
+    }
+
+    // ── Compter les non lues (pour le badge) ─────────────────
+    public long countUnreadForCurrentUser() {
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Utilisateur non trouvé"));
+        return notificationRepository.countByUserIdAndStatus(user.getId(), "Unread");
+    }
+
+    // ── Marquer une notification comme lue ───────────────────
+    public NotificationResponseDTO markAsRead(Long id) {
+        Notification notification = notificationRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Notification non trouvée : " + id));
+        notification.setStatus("Read");
+        return toDTO(notificationRepository.save(notification));
+    }
+
+    // ── Marquer toutes comme lues ────────────────────────────
+    public void markAllAsRead() {
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Utilisateur non trouvé"));
+
+        List<Notification> unread = notificationRepository
+                .findByUserIdAndStatus(user.getId(), "Unread");
+        unread.forEach(n -> n.setStatus("Read"));
+        notificationRepository.saveAll(unread);
     }
 }

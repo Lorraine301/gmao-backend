@@ -18,6 +18,9 @@ import com.suprajit.gmao_backend.intervention.dto.InterventionResponseDTO;
 import com.suprajit.gmao_backend.repository.FailureRepository;
 import com.suprajit.gmao_backend.repository.InterventionRepository;
 import com.suprajit.gmao_backend.repository.UserRepository;
+import com.suprajit.gmao_backend.sparepart.dto.AddInterventionPartsRequestDTO;
+import com.suprajit.gmao_backend.sparepart.dto.ConsumeStockRequestDTO;
+import com.suprajit.gmao_backend.sparepart.service.SparePartService;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +33,7 @@ public class InterventionService {
     private final InterventionRepository interventionRepository;
     private final FailureRepository failureRepository;
     private final UserRepository userRepository;
+    private final SparePartService sparePartService;   // ← INDISPENSABLE
 
     // ── Mapper entité → DTO (résout toutes les relations) ──
     private InterventionResponseDTO toDTO(Intervention i) {
@@ -74,7 +78,7 @@ public class InterventionService {
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Technicien non trouvé avec l'id : " + dto.getTechnicianId()));
 
-        User assignedBy = getCurrentUser(); // Supervisor/Admin connecté
+        User assignedBy = getCurrentUser();
 
         Intervention intervention = Intervention.builder()
                 .failure(failure)
@@ -87,7 +91,6 @@ public class InterventionService {
 
         Intervention saved = interventionRepository.save(intervention);
 
-        // Mettre à jour le statut de la panne liée
         failure.setStatus(FailureStatus.In_Progress);
         failureRepository.save(failure);
 
@@ -116,8 +119,10 @@ public class InterventionService {
         return toDTO(interventionRepository.save(intervention));
     }
 
-    // ── COMPLETE (clôture avec calcul de durée) ────────────
-    public InterventionResponseDTO complete(Long id, String solution) {
+    // ── COMPLETE (clôture + calcul durée + pièces utilisées) ──
+    public InterventionResponseDTO complete(Long id, String solution,
+            List<ConsumeStockRequestDTO> parts) {
+
         Intervention intervention = interventionRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Intervention non trouvée avec l'id : " + id));
@@ -126,12 +131,19 @@ public class InterventionService {
         double durationHours = ChronoUnit.MINUTES.between(intervention.getStartTime(), now) / 60.0;
 
         intervention.setEndTime(now);
-        intervention.setDuration(Math.round(durationHours * 100.0) / 100.0); // arrondi à 2 décimales
+        intervention.setDuration(Math.round(durationHours * 100.0) / 100.0);
         intervention.setSolution(solution);
         intervention.setStatus(InterventionStatus.Completed);
         intervention.setClosedBy(getCurrentUser());
 
         Intervention saved = interventionRepository.save(intervention);
+
+        // ── Enregistrer les pièces utilisées si fourni ────────
+        if (parts != null && !parts.isEmpty()) {
+            AddInterventionPartsRequestDTO partsRequest = new AddInterventionPartsRequestDTO();
+            partsRequest.setParts(parts);
+            sparePartService.addPartsToIntervention(saved.getId(), partsRequest);
+        }
 
         // Mettre à jour le statut de la panne liée à Resolved
         Failure failure = intervention.getFailure();

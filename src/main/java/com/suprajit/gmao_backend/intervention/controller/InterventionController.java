@@ -89,11 +89,12 @@ public class InterventionController {
     @Operation(
         summary = "Clôturer une intervention",
         description = "Termine l'intervention : calcule automatiquement la durée, enregistre la solution, " +
-                      "passe le statut à Completed et la panne liée à Resolved."
+                      "passe le statut à Completed et la panne liée à Resolved. " +
+                      "Enregistre également les pièces utilisées si fournies (décrémente le stock)."
     )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Intervention clôturée"),
-        @ApiResponse(responseCode = "400", description = "Solution manquante"),
+        @ApiResponse(responseCode = "400", description = "Solution manquante ou stock insuffisant"),
         @ApiResponse(responseCode = "404", description = "Intervention non trouvée")
     })
     @PutMapping("/{id}/complete")
@@ -101,6 +102,7 @@ public class InterventionController {
     public ResponseEntity<InterventionResponseDTO> complete(
             @PathVariable Long id,
             @Valid @RequestBody CompleteInterventionDTO dto) {
-        return ResponseEntity.ok(interventionService.complete(id, dto.getSolution()));
+        return ResponseEntity.ok(
+            interventionService.complete(id, dto.getSolution(), dto.getParts()));
     }
 }

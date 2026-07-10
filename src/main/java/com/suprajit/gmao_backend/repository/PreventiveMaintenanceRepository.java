@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import com.suprajit.gmao_backend.entity.PreventiveMaintenance;
+import com.suprajit.gmao_backend.entity.enums.ExecutionStatus;
 import com.suprajit.gmao_backend.entity.enums.MaintenanceStatus;
 
 public interface PreventiveMaintenanceRepository
@@ -28,4 +29,7 @@ public interface PreventiveMaintenanceRepository
            "pm.nextReminderDate <= :today AND pm.status = 'Scheduled'")
     List<PreventiveMaintenance> findDueForReminder(
         @org.springframework.data.repository.query.Param("today") LocalDate today);
+
+    List<PreventiveMaintenance> findByAssignedTechnicianIdAndExecutionStatusNot(
+    Long technicianId, ExecutionStatus excludedStatus);
 }

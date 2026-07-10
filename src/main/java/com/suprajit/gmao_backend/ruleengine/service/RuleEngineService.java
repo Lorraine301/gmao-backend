@@ -1,24 +1,27 @@
 package com.suprajit.gmao_backend.ruleengine.service;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.suprajit.gmao_backend.entity.Equipment;
 import com.suprajit.gmao_backend.entity.Failure;
 import com.suprajit.gmao_backend.entity.User;
 import com.suprajit.gmao_backend.entity.enums.CriticalityLevel;
 import com.suprajit.gmao_backend.entity.enums.FailurePriority;
+import com.suprajit.gmao_backend.notification.service.NotificationService;
 import com.suprajit.gmao_backend.repository.EquipmentRepository;
 import com.suprajit.gmao_backend.repository.FailureRepository;
 import com.suprajit.gmao_backend.repository.InterventionRepository;
 import com.suprajit.gmao_backend.repository.UserRepository;
 import com.suprajit.gmao_backend.ruleengine.dto.AtRiskEquipmentDTO;
 import com.suprajit.gmao_backend.ruleengine.dto.RuleEvaluationResult;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +32,7 @@ public class RuleEngineService {
     private final InterventionRepository interventionRepository;
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     // Seuil MTTR au-delà duquel un équipement est considéré à risque (en heures)
     private static final double MTTR_THRESHOLD = 4.0;
@@ -78,6 +82,16 @@ public class RuleEngineService {
         // ── Règle 4 : recommandation de technicien ──
         Optional<User> recommendedTechnician = findRecommendedTechnician(failure);
 
+        // Dans evaluateFailure(), après avoir calculé computedPriority :
+        if (computedPriority == FailurePriority.Critical && !triggeredRules.isEmpty()) {
+            notificationService.notifyAdminsAndSupervisors(
+                "Critical",
+                String.format("🚨 Panne urgente détectée sur %s : %s — Règle déclenchée",
+                    failure.getEquipment().getCode(), failure.getTitle()),
+                "Failure",
+                failure.getId()
+            );
+        }
         return RuleEvaluationResult.builder()
                 .computedPriority(computedPriority)
                 .triggeredRules(triggeredRules)

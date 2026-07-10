@@ -1,11 +1,12 @@
 package com.suprajit.gmao_backend.preventivemaintenance.dto;
 
-import com.suprajit.gmao_backend.entity.enums.MaintenanceStatus;
-import lombok.Builder;
-import lombok.Data;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+
+import com.suprajit.gmao_backend.entity.enums.MaintenanceStatus;
+
+import lombok.Builder;
+import lombok.Data;
 
 @Data
 @Builder
@@ -32,4 +33,14 @@ public class PreventiveMaintenanceResponseDTO {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private Long assignedTechnicianId;
+    private String assignedTechnicianName;
+    private Long assignedByIdField;      // renomme si conflit avec un champ existant
+    private String assignedByName;
+    private String executionStatus;      // Pending, In_Progress, Completed, ou null
+    private String problemFound;
+    private String solution;
+    private LocalDateTime technicianStartTime;
+    private LocalDateTime technicianEndTime;
 }

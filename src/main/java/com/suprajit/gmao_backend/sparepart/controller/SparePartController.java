@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.suprajit.gmao_backend.sparepart.dto.AddInterventionPartsRequestDTO;
 import com.suprajit.gmao_backend.sparepart.dto.InterventionPartResponseDTO;
+import com.suprajit.gmao_backend.sparepart.dto.PartConsumptionResponseDTO;
 import com.suprajit.gmao_backend.sparepart.dto.SparePartRequestDTO;
 import com.suprajit.gmao_backend.sparepart.dto.SparePartResponseDTO;
 import com.suprajit.gmao_backend.sparepart.service.SparePartService;
@@ -106,5 +107,18 @@ public class SparePartController {
             @Valid @RequestBody AddInterventionPartsRequestDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(sparePartService.addPartsToIntervention(interventionId, dto));
+    }
+
+   // ── GET /api/spare-parts/consumption-history ────────────
+    @Operation(
+        summary = "Historique de consommation des pièces",
+        description = "Retourne l'historique agrégé des pièces consommées, via interventions de pannes " +
+                      "et maintenances préventives. Filtre optionnel : ?type=CORRECTIVE ou ?type=PREVENTIVE"
+    )
+    @GetMapping("/api/spare-parts/consumption-history")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor')")
+    public ResponseEntity<List<PartConsumptionResponseDTO>> getConsumptionHistory(
+            @RequestParam(required = false) String type) {
+        return ResponseEntity.ok(sparePartService.getConsumptionHistory(type));
     }
 }

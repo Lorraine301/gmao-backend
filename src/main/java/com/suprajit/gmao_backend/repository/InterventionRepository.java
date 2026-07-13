@@ -1,5 +1,6 @@
 package com.suprajit.gmao_backend.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,4 +24,6 @@ public interface InterventionRepository extends JpaRepository<Intervention, Long
              AND i.duration IS NOT NULL
            """)
     Double findAverageMttrByEquipment(@Param("equipmentId") Long equipmentId);
+    List<Intervention> findByStartTimeBetween(LocalDateTime from, LocalDateTime to);
+    List<Intervention> findByStatusAndStartTimeBetween(InterventionStatus status, LocalDateTime from, LocalDateTime to);
 }

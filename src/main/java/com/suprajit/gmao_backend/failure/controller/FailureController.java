@@ -122,4 +122,22 @@ public class FailureController {
             @Valid @RequestBody UpdatePriorityDTO dto) {
         return ResponseEntity.ok(failureService.updatePriority(id, dto.getPriority()));
     }
+
+    // ── PUT /api/failures/{id}/close ─────────────────────────
+    @Operation(
+        summary = "Clôturer définitivement une panne",
+        description = "Réservé à Admin/Supervisor. Ne fonctionne que si la panne est au statut Resolved."
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Panne clôturée"),
+        @ApiResponse(responseCode = "400", description = "La panne n'est pas au statut Resolved"),
+        @ApiResponse(responseCode = "404", description = "Panne non trouvée")
+    })
+    @PutMapping("/{id}/close")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor')")
+    public ResponseEntity<FailureResponseDTO> closeFailure(@PathVariable Long id) {
+        return ResponseEntity.ok(failureService.closeFailure(id));
+    }
+
+
 }

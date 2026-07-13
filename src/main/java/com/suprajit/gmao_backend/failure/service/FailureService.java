@@ -165,5 +165,21 @@ public class FailureService {
     return failureRepository.findUrgent()
             .stream().map(this::toDTO).toList();
     }
+    // ── Clôture définitive (Admin/Supervisor uniquement) ────
+    public FailureResponseDTO closeFailure(Long id) {
+        Failure failure = failureRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Panne non trouvée avec l'id : " + id));
+
+        if (failure.getStatus() != FailureStatus.Resolved) {
+            throw new IllegalStateException(
+                "Seule une panne au statut 'Resolved' peut être clôturée définitivement. Statut actuel : "
+                + failure.getStatus());
+        }
+
+        failure.setStatus(FailureStatus.Closed);
+
+        return toDTO(failureRepository.save(failure));
+    }
 
 }

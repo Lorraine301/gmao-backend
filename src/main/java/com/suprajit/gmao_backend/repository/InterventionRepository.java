@@ -13,6 +13,8 @@ public interface InterventionRepository extends JpaRepository<Intervention, Long
     List<Intervention> findByTechnicianId(Long technicianId);
     List<Intervention> findByFailureId(Long failureId);
     List<Intervention> findByStatus(InterventionStatus status);
+    List<Intervention> findByTechnicianIdAndStatus(Long technicianId, InterventionStatus status);
+    List<Intervention> findByTechnicianIdAndStatusNot(Long technicianId, InterventionStatus status);
 
  @Query("""
            SELECT AVG(i.duration)

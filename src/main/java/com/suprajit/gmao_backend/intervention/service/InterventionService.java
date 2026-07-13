@@ -15,6 +15,7 @@ import com.suprajit.gmao_backend.entity.enums.FailureStatus;
 import com.suprajit.gmao_backend.entity.enums.InterventionStatus;
 import com.suprajit.gmao_backend.intervention.dto.InterventionRequestDTO;
 import com.suprajit.gmao_backend.intervention.dto.InterventionResponseDTO;
+import com.suprajit.gmao_backend.notification.service.NotificationService;
 import com.suprajit.gmao_backend.repository.FailureRepository;
 import com.suprajit.gmao_backend.repository.InterventionRepository;
 import com.suprajit.gmao_backend.repository.UserRepository;
@@ -34,6 +35,7 @@ public class InterventionService {
     private final FailureRepository failureRepository;
     private final UserRepository userRepository;
     private final SparePartService sparePartService;   // ← INDISPENSABLE
+    private final NotificationService notificationService;
 
     // ── Mapper entité → DTO (résout toutes les relations) ──
     private InterventionResponseDTO toDTO(Intervention i) {
@@ -94,6 +96,17 @@ public class InterventionService {
         failure.setStatus(FailureStatus.In_Progress);
         failureRepository.save(failure);
 
+         // ── Notifier le technicien de sa nouvelle intervention ──
+        notificationService.create(
+            technician.getId(),
+            "Info",
+            String.format("🔧 Nouvelle intervention assignée : %s sur %s (%s)",
+                failure.getTitle(), failure.getEquipment().getCode(), failure.getEquipment().getName()),
+            "Intervention",
+            saved.getId()
+        );
+
+
         return toDTO(saved);
     }
 
@@ -103,9 +116,15 @@ public class InterventionService {
                 .stream().map(this::toDTO).toList();
     }
 
-    // ── READ BY TECHNICIAN (mes interventions) ────────────
+    // ── READ BY TECHNICIAN (mes interventions ACTIVES) ────────
     public List<InterventionResponseDTO> findByTechnician(Long technicianId) {
-        return interventionRepository.findByTechnicianId(technicianId)
+        return interventionRepository.findByTechnicianIdAndStatusNot(technicianId, InterventionStatus.Completed)
+                .stream().map(this::toDTO).toList();
+    }
+
+    // ── READ BY TECHNICIAN (archives, terminées) ───────────────
+    public List<InterventionResponseDTO> findMyArchive(Long technicianId) {
+        return interventionRepository.findByTechnicianIdAndStatus(technicianId, InterventionStatus.Completed)
                 .stream().map(this::toDTO).toList();
     }
 

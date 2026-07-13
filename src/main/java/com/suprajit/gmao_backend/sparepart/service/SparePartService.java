@@ -21,6 +21,7 @@ import com.suprajit.gmao_backend.sparepart.dto.AddInterventionPartsRequestDTO;
 import com.suprajit.gmao_backend.sparepart.dto.ConsumeStockRequestDTO;
 import com.suprajit.gmao_backend.sparepart.dto.InterventionPartResponseDTO;
 import com.suprajit.gmao_backend.sparepart.dto.PartConsumptionResponseDTO;
+import com.suprajit.gmao_backend.sparepart.dto.PreventiveMaintenancePartResponseDTO;
 import com.suprajit.gmao_backend.sparepart.dto.SparePartRequestDTO;
 import com.suprajit.gmao_backend.sparepart.dto.SparePartResponseDTO;
 
@@ -293,5 +294,34 @@ public class SparePartService {
         result.sort((a, b) -> b.getConsumptionDate().compareTo(a.getConsumptionDate()));
 
         return result;
+    }
+    // ── Pièces utilisées pour une intervention donnée ────────
+    public List<InterventionPartResponseDTO> findPartsByIntervention(Long interventionId) {
+        return interventionPartRepository.findByInterventionId(interventionId).stream()
+                .map(ip -> InterventionPartResponseDTO.builder()
+                        .id(ip.getId())
+                        .interventionId(interventionId)
+                        .sparePartId(ip.getSparePart().getId())
+                        .sparePartName(ip.getSparePart().getName())
+                        .sparePartReference(ip.getSparePart().getReference())
+                        .quantityUsed(ip.getQuantityUsed())
+                        .createdAt(ip.getCreatedAt())
+                        .build())
+                .toList();
+    }
+
+    // ── Pièces utilisées pour une maintenance préventive donnée ──
+    public List<PreventiveMaintenancePartResponseDTO> findPartsByPreventiveMaintenance(Long pmId) {
+        return preventiveMaintenancePartRepository.findByPreventiveMaintenanceId(pmId).stream()
+                .map(pmp -> PreventiveMaintenancePartResponseDTO.builder()
+                        .id(pmp.getId())
+                        .preventiveMaintenanceId(pmId)
+                        .sparePartId(pmp.getSparePart().getId())
+                        .sparePartName(pmp.getSparePart().getName())
+                        .sparePartReference(pmp.getSparePart().getReference())
+                        .quantityUsed(pmp.getQuantityUsed())
+                        .createdAt(pmp.getCreatedAt())
+                        .build())
+                .toList();
     }
 }

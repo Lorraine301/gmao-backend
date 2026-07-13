@@ -11,7 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.suprajit.gmao_backend.entity.Equipment;
 import com.suprajit.gmao_backend.entity.PreventiveMaintenance;
+import com.suprajit.gmao_backend.entity.User;
+import com.suprajit.gmao_backend.entity.enums.ExecutionStatus;
 import com.suprajit.gmao_backend.entity.enums.MaintenanceStatus;
+import com.suprajit.gmao_backend.notification.service.NotificationService;
 import com.suprajit.gmao_backend.preventivemaintenance.dto.PreventiveMaintenanceRequestDTO;
 import com.suprajit.gmao_backend.preventivemaintenance.dto.PreventiveMaintenanceResponseDTO;
 import com.suprajit.gmao_backend.repository.EquipmentRepository;
@@ -19,8 +22,6 @@ import com.suprajit.gmao_backend.repository.PreventiveMaintenanceRepository;
 import com.suprajit.gmao_backend.repository.UserRepository;
 import com.suprajit.gmao_backend.sparepart.dto.ConsumeStockRequestDTO;
 import com.suprajit.gmao_backend.sparepart.service.SparePartService;
-import com.suprajit.gmao_backend.entity.User;
-import com.suprajit.gmao_backend.entity.enums.ExecutionStatus;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class PreventiveMaintenanceService {
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
     private final SparePartService sparePartService;
+    private final NotificationService notificationService;
 
     // ── Mapper entité → DTO ─────────────────────────────────
     private PreventiveMaintenanceResponseDTO toDTO(PreventiveMaintenance pm) {
@@ -154,9 +156,20 @@ public class PreventiveMaintenanceService {
         pm.setAssignedBy(getCurrentUser());
         pm.setExecutionStatus(ExecutionStatus.Pending);
 
-        return toDTO(pmRepository.save(pm));
-    }
+        PreventiveMaintenance saved = pmRepository.save(pm);
 
+        // ── Notifier le technicien de sa nouvelle maintenance ──
+        notificationService.create(
+                technician.getId(),
+                "Info",
+                String.format("🔧 Nouvelle maintenance préventive assignée : %s sur %s (%s)",
+                pm.getMaintenanceType(), pm.getEquipment().getCode(), pm.getEquipment().getName()),
+                "PreventiveMaintenance",
+                saved.getId()
+        );
+
+        return toDTO(saved);
+}
     // ── Mes maintenances (technicien connecté) ──────────────
     public List<PreventiveMaintenanceResponseDTO> findMy(Long technicianId) {
         return pmRepository
@@ -204,4 +217,11 @@ public class PreventiveMaintenanceService {
 
         return toDTO(saved);
     }
+        // ── Archives (technicien connecté) ──────────────────────
+        public List<PreventiveMaintenanceResponseDTO> findMyArchive(Long technicianId) {
+        return pmRepository
+                .findByAssignedTechnicianIdAndExecutionStatus(technicianId, ExecutionStatus.Completed)
+                .stream().map(this::toDTO).toList();
+        }
+    
 }

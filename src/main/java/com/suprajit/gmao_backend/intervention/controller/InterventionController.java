@@ -105,4 +105,13 @@ public class InterventionController {
         return ResponseEntity.ok(
             interventionService.complete(id, dto.getSolution(), dto.getParts()));
     }
+
+    // ── GET /api/interventions/my/archive ───────────────────
+    @Operation(summary = "Mes interventions terminées (archives)")
+    @GetMapping("/my/archive")
+    @PreAuthorize("hasRole('Technician')")
+    public ResponseEntity<List<InterventionResponseDTO>> findMyArchive() {
+        Long currentUserId = interventionService.getCurrentUserId();
+        return ResponseEntity.ok(interventionService.findMyArchive(currentUserId));
+    }
 }

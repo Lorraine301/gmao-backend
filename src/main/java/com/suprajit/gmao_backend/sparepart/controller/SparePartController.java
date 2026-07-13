@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.suprajit.gmao_backend.sparepart.dto.AddInterventionPartsRequestDTO;
 import com.suprajit.gmao_backend.sparepart.dto.InterventionPartResponseDTO;
 import com.suprajit.gmao_backend.sparepart.dto.PartConsumptionResponseDTO;
+import com.suprajit.gmao_backend.sparepart.dto.PreventiveMaintenancePartResponseDTO;
 import com.suprajit.gmao_backend.sparepart.dto.SparePartRequestDTO;
 import com.suprajit.gmao_backend.sparepart.dto.SparePartResponseDTO;
 import com.suprajit.gmao_backend.sparepart.service.SparePartService;
@@ -120,5 +121,22 @@ public class SparePartController {
     public ResponseEntity<List<PartConsumptionResponseDTO>> getConsumptionHistory(
             @RequestParam(required = false) String type) {
         return ResponseEntity.ok(sparePartService.getConsumptionHistory(type));
+    }
+    // ── GET /api/interventions/{id}/parts ────────────────────
+    @Operation(summary = "Lister les pièces utilisées pour une intervention")
+    @GetMapping("/api/interventions/{interventionId}/parts")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor') or hasRole('Technician')")
+    public ResponseEntity<List<InterventionPartResponseDTO>> getPartsByIntervention(
+            @PathVariable Long interventionId) {
+        return ResponseEntity.ok(sparePartService.findPartsByIntervention(interventionId));
+    }
+
+    // ── GET /api/preventive-maintenances/{id}/parts ──────────
+    @Operation(summary = "Lister les pièces utilisées pour une maintenance préventive")
+    @GetMapping("/api/preventive-maintenances/{maintenanceId}/parts")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor') or hasRole('Technician')")
+    public ResponseEntity<List<PreventiveMaintenancePartResponseDTO>> getPartsByMaintenance(
+            @PathVariable Long maintenanceId) {
+        return ResponseEntity.ok(sparePartService.findPartsByPreventiveMaintenance(maintenanceId));
     }
 }

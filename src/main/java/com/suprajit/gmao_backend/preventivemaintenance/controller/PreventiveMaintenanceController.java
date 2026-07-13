@@ -109,41 +109,49 @@ public class PreventiveMaintenanceController {
     }
 
     // ── PUT /api/preventive-maintenances/{id}/assign ─────────
-@Operation(summary = "Affecter un technicien à une maintenance préventive")
-@PutMapping("/{id}/assign")
-@PreAuthorize("hasRole('Admin') or hasRole('Supervisor')")
-public ResponseEntity<PreventiveMaintenanceResponseDTO> assignTechnician(
-        @PathVariable Long id, @Valid @RequestBody AssignTechnicianRequestDTO dto) {
-    return ResponseEntity.ok(pmService.assignTechnician(id, dto.getTechnicianId()));
-}
+    @Operation(summary = "Affecter un technicien à une maintenance préventive")
+    @PutMapping("/{id}/assign")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor')")
+    public ResponseEntity<PreventiveMaintenanceResponseDTO> assignTechnician(
+            @PathVariable Long id, @Valid @RequestBody AssignTechnicianRequestDTO dto) {
+        return ResponseEntity.ok(pmService.assignTechnician(id, dto.getTechnicianId()));
+    }
 
-// ── GET /api/preventive-maintenances/my ──────────────────
-@Operation(summary = "Mes maintenances préventives assignées (technicien connecté)")
-@GetMapping("/my")
-@PreAuthorize("hasRole('Technician')")
-public ResponseEntity<List<PreventiveMaintenanceResponseDTO>> findMy() {
-    Long currentUserId = pmService.getCurrentUserId(); // à ajouter, même pattern que InterventionService
-    return ResponseEntity.ok(pmService.findMy(currentUserId));
-}
+    // ── GET /api/preventive-maintenances/my ──────────────────
+    @Operation(summary = "Mes maintenances préventives assignées (technicien connecté)")
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('Technician')")
+    public ResponseEntity<List<PreventiveMaintenanceResponseDTO>> findMy() {
+        Long currentUserId = pmService.getCurrentUserId(); // à ajouter, même pattern que InterventionService
+        return ResponseEntity.ok(pmService.findMy(currentUserId));
+    }
 
-// ── PUT /api/preventive-maintenances/{id}/start ──────────
-@Operation(summary = "Démarrer l'exécution d'une maintenance préventive")
-@PutMapping("/{id}/start")
-@PreAuthorize("hasRole('Technician')")
-public ResponseEntity<PreventiveMaintenanceResponseDTO> startExecution(@PathVariable Long id) {
-    return ResponseEntity.ok(pmService.startExecution(id));
-}
+    // ── PUT /api/preventive-maintenances/{id}/start ──────────
+    @Operation(summary = "Démarrer l'exécution d'une maintenance préventive")
+    @PutMapping("/{id}/start")
+    @PreAuthorize("hasRole('Technician')")
+    public ResponseEntity<PreventiveMaintenanceResponseDTO> startExecution(@PathVariable Long id) {
+        return ResponseEntity.ok(pmService.startExecution(id));
+    }
 
-// ── PUT /api/preventive-maintenances/{id}/complete-technician ──
-@Operation(
-    summary = "Clôturer une maintenance préventive (technicien)",
-    description = "Problème trouvé, solution et pièces sont tous optionnels si aucun problème détecté."
-)
-@PutMapping("/{id}/complete-technician")
-@PreAuthorize("hasRole('Technician')")
-public ResponseEntity<PreventiveMaintenanceResponseDTO> completeByTechnician(
-        @PathVariable Long id, @RequestBody CompletePreventiveMaintenanceDTO dto) {
-    return ResponseEntity.ok(pmService.completeByTechnician(
-        id, dto.getProblemFound(), dto.getSolution(), dto.getParts()));
-}
+    // ── PUT /api/preventive-maintenances/{id}/complete-technician ──
+    @Operation(
+        summary = "Clôturer une maintenance préventive (technicien)",
+        description = "Problème trouvé, solution et pièces sont tous optionnels si aucun problème détecté."
+    )
+    @PutMapping("/{id}/complete-technician")
+    @PreAuthorize("hasRole('Technician')")
+    public ResponseEntity<PreventiveMaintenanceResponseDTO> completeByTechnician(
+            @PathVariable Long id, @RequestBody CompletePreventiveMaintenanceDTO dto) {
+        return ResponseEntity.ok(pmService.completeByTechnician(
+            id, dto.getProblemFound(), dto.getSolution(), dto.getParts()));
+    }
+    // ── GET /api/preventive-maintenances/my/archive ──────────
+    @Operation(summary = "Mes maintenances préventives terminées (archives)")
+    @GetMapping("/my/archive")
+    @PreAuthorize("hasRole('Technician')")
+    public ResponseEntity<List<PreventiveMaintenanceResponseDTO>> findMyArchive() {
+        Long currentUserId = pmService.getCurrentUserId();
+        return ResponseEntity.ok(pmService.findMyArchive(currentUserId));
+    }
 }

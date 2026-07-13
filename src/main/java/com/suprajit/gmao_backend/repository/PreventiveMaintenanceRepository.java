@@ -32,4 +32,7 @@ public interface PreventiveMaintenanceRepository
 
     List<PreventiveMaintenance> findByAssignedTechnicianIdAndExecutionStatusNot(
     Long technicianId, ExecutionStatus excludedStatus);
+
+    List<PreventiveMaintenance> findByAssignedTechnicianIdAndExecutionStatus(
+    Long technicianId, ExecutionStatus status);
 }

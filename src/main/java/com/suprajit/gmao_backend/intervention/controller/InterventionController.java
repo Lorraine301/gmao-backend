@@ -1,8 +1,11 @@
 package com.suprajit.gmao_backend.intervention.controller;
 
+import java.io.IOException;
 import java.util.List;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +21,7 @@ import com.suprajit.gmao_backend.intervention.dto.InterventionRequestDTO;
 import com.suprajit.gmao_backend.intervention.dto.InterventionResponseDTO;
 import com.suprajit.gmao_backend.intervention.dto.UpdateInterventionStatusDTO;
 import com.suprajit.gmao_backend.intervention.service.InterventionService;
+import com.suprajit.gmao_backend.pdf.service.PdfService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -113,5 +117,38 @@ public class InterventionController {
     public ResponseEntity<List<InterventionResponseDTO>> findMyArchive() {
         Long currentUserId = interventionService.getCurrentUserId();
         return ResponseEntity.ok(interventionService.findMyArchive(currentUserId));
+    }
+
+    // ── Injection supplémentaire ──
+    private final PdfService pdfService;
+
+    // ── GET /api/interventions/{id}/pdf ──────────────────────
+    @Operation(
+        summary = "Télécharger le PDF d'une intervention",
+        description = "Génère le PDF s'il n'existe pas encore, sinon retourne la version déjà générée."
+    )
+    @GetMapping("/{id}/pdf")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor') or hasRole('Technician')")
+    public ResponseEntity<byte[]> getPdf(@PathVariable Long id) throws IOException {
+        byte[] pdfBytes = pdfService.getOrGenerateReportBytes(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=intervention_" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdfBytes);
+    }
+
+    // ── GET /api/interventions/{id}/pdf/generate ─────────────
+    @Operation(
+        summary = "Régénérer le PDF d'une intervention",
+        description = "Force la régénération du PDF même s'il existe déjà (données à jour)."
+    )
+    @GetMapping("/{id}/pdf/generate")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor') or hasRole('Technician')")
+    public ResponseEntity<byte[]> regeneratePdf(@PathVariable Long id) throws IOException {
+        byte[] pdfBytes = pdfService.regenerateReportBytes(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=intervention_" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdfBytes);
     }
 }

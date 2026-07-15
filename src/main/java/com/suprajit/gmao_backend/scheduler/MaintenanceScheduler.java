@@ -11,6 +11,7 @@ import com.suprajit.gmao_backend.entity.PreventiveMaintenance;
 import com.suprajit.gmao_backend.entity.enums.MaintenanceStatus;
 import com.suprajit.gmao_backend.notification.service.NotificationService;
 import com.suprajit.gmao_backend.repository.PreventiveMaintenanceRepository;
+import com.suprajit.gmao_backend.weeklyreport.service.WeeklyReportService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -20,6 +21,8 @@ public class MaintenanceScheduler {
 
     private final PreventiveMaintenanceRepository pmRepository;
     private final NotificationService notificationService;
+    private final WeeklyReportService weeklyReportService;
+
 
     // ── Tâche principale : chaque jour à 8h30 ───────────────
     @Scheduled(cron = "0 30 8 * * *")
@@ -105,5 +108,13 @@ public class MaintenanceScheduler {
         // TODO Sprint 5 : récupérer les AiAnalysis en statut Pending
         // et relancer l'appel Groq API
         System.out.println("[SCHEDULER] TODO Sprint 5 : retry LLM analyses pending");
+    }
+    // ── Génération du bilan hebdomadaire : chaque dimanche à 18h ──
+    @Scheduled(cron = "0 0 18 * * SUN")
+    @Transactional
+    public void generateWeeklyReportScheduled() {
+        System.out.println("[SCHEDULER] Génération du bilan hebdomadaire...");
+        weeklyReportService.generateWeeklyReport();
+        System.out.println("[SCHEDULER] Bilan hebdomadaire généré avec succès.");
     }
 }

@@ -37,4 +37,5 @@ public interface FailureRepository extends JpaRepository<Failure, Long> {
     @Query("SELECT f FROM Failure f WHERE f.priority = 'Critical' AND f.status != 'Closed'")
     List<Failure> findUrgent();
     List<Failure> findByReportedAtBetween(LocalDateTime from, LocalDateTime to);
+    List<Failure> findTop2ByEquipmentIdOrderByReportedAtDesc(Long equipmentId); //our récupérer les 2 dernières pannes d'un équipement, utile pour la règle 6
 }

@@ -13,4 +13,6 @@ public class AtRiskEquipmentDTO {
     private long recentFailuresCount;
     private double averageMttr;
     private String riskReason;
+    private String llmExplanation;
+
 }

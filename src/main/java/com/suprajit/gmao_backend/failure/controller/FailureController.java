@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.suprajit.gmao_backend.ai.dto.AiAnalysisResponseDTO;
+import com.suprajit.gmao_backend.ai.service.AiAnalysisService;
 import com.suprajit.gmao_backend.entity.enums.FailurePriority;
 import com.suprajit.gmao_backend.entity.enums.FailureStatus;
 import com.suprajit.gmao_backend.failure.dto.FailureRequestDTO;
@@ -50,11 +52,18 @@ public class FailureController {
         @ApiResponse(responseCode = "400", description = "Données invalides"),
         @ApiResponse(responseCode = "404", description = "Équipement non trouvé")
     })
-    @PostMapping
+   @PostMapping
     @PreAuthorize("hasRole('Technician') or hasRole('Supervisor') or hasRole('Admin')")
     public ResponseEntity<FailureResponseDTO> declare(
             @Valid @RequestBody FailureRequestDTO dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(failureService.declare(dto));
+        FailureResponseDTO created = failureService.declare(dto);
+
+        // ── Déclenche l'analyse IA en asynchrone, APRÈS que la transaction
+        // de declare() soit déjà validée (commit), pour que le thread async
+        // puisse bien retrouver la panne en base ──
+        aiAnalysisService.analyzeFailure(created.getId());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     // ── GET /api/failures ──────────────────────────────────────
@@ -137,6 +146,24 @@ public class FailureController {
     @PreAuthorize("hasRole('Admin') or hasRole('Supervisor')")
     public ResponseEntity<FailureResponseDTO> closeFailure(@PathVariable Long id) {
         return ResponseEntity.ok(failureService.closeFailure(id));
+    }
+    private final AiAnalysisService aiAnalysisService;
+
+    // ── GET /api/failures/{id}/analysis ───────────────────────
+    @Operation(summary = "Récupérer l'analyse IA d'une panne")
+    @GetMapping("/{id}/analysis")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor') or hasRole('Technician')")
+    public ResponseEntity<AiAnalysisResponseDTO> getAnalysis(@PathVariable Long id) {
+        return ResponseEntity.ok(aiAnalysisService.getByFailureId(id));
+    }
+
+    // ── POST /api/failures/{id}/analysis/retry ────────────────
+    @Operation(summary = "Relancer l'analyse IA d'une panne (si Failed)")
+    @PostMapping("/{id}/analysis/retry")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor')")
+    public ResponseEntity<Void> retryAnalysis(@PathVariable Long id) {
+        aiAnalysisService.retryAnalysis(id);
+        return ResponseEntity.accepted().build();
     }
 
 

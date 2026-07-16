@@ -1,7 +1,10 @@
 package com.suprajit.gmao_backend.kpi.controller;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.suprajit.gmao_backend.ai.service.AiAnalysisService;
 import com.suprajit.gmao_backend.kpi.dto.AvailabilityResponseDTO;
 import com.suprajit.gmao_backend.kpi.dto.EquipmentFailureCountDTO;
 import com.suprajit.gmao_backend.kpi.dto.KpiSummaryDTO;
@@ -36,6 +40,7 @@ import lombok.RequiredArgsConstructor;
 public class KpiController {
 
     private final KpiService kpiService;
+    private final AiAnalysisService aiAnalysisService;
 
     // ── GET /api/kpi/summary ─────────────────────────────────
     @Operation(summary = "Résumé global des KPI",
@@ -128,5 +133,32 @@ public class KpiController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ResponseEntity.ok(kpiService.getInterventionsByTechnician(period, from, to));
+    }
+
+        // ── GET /api/kpi/ai-interpretation ───────────────────────
+    @Operation(
+        summary = "Interprétation IA des KPI actuels",
+        description = "Analyse narrative générée par le LLM à partir des indicateurs de performance. Mise en cache 1h."
+    )
+    @GetMapping("/ai-interpretation")
+    public ResponseEntity<Map<String, String>> getAiInterpretation() {
+        KpiSummaryDTO summary = kpiService.getSummary(30, null, null);
+        MttrResponseDTO mttr = kpiService.calculateMTTR(null, 30, null, null);
+        AvailabilityResponseDTO availability = kpiService.calculateAvailabilityRate(null, 30, null, null);
+        List<EquipmentFailureCountDTO> topEquipments = kpiService.getFailuresByEquipment(30, null, null);
+
+        Map<String, Object> kpiData = new LinkedHashMap<>();
+        kpiData.put("Total pannes (30 derniers jours)", summary.getTotalFailures());
+        kpiData.put("Taux de résolution", summary.getResolutionRate() + "%");
+        kpiData.put("MTTR moyen", mttr.getMttr() != null ? mttr.getMttr() + "h" : "non disponible");
+        kpiData.put("Taux de disponibilité", availability.getAvailabilityRate() + "%");
+        kpiData.put("Top équipements défaillants", topEquipments.stream()
+                .limit(5)
+                .map(e -> e.getEquipmentCode() + " (" + e.getFailureCount() + " pannes)")
+                .collect(Collectors.joining(", ")));
+
+        String interpretation = aiAnalysisService.interpretKpis(kpiData);
+        return ResponseEntity.ok(Map.of("interpretation", interpretation));
+    
     }
 }

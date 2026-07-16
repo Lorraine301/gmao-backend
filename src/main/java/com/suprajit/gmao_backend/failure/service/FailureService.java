@@ -7,6 +7,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.suprajit.gmao_backend.ai.service.AiAnalysisService;
 import com.suprajit.gmao_backend.entity.Equipment;
 import com.suprajit.gmao_backend.entity.Failure;
 import com.suprajit.gmao_backend.entity.User;
@@ -32,6 +33,7 @@ public class FailureService {
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
     private final RuleEngineService ruleEngineService;
+    private final AiAnalysisService aiAnalysisService;
 
     // ── Mapper entité → DTO (résout équipement + déclarant) ──
     private FailureResponseDTO toDTO(Failure f) {
@@ -113,15 +115,14 @@ public class FailureService {
         // ← Stocker si une règle a été déclenchée
         saved.setRuleEngineTriggered(!ruleResult.getTriggeredRules().isEmpty());
         saved.setRecommendedTechnicianId(ruleResult.getRecommendedTechnicianId());
-        
         saved = failureRepository.save(saved);
 
-        if (!ruleResult.getTriggeredRules().isEmpty()) {
-            System.out.println("[RULE ENGINE] Panne " + saved.getFailureCode() + " :");
-            ruleResult.getTriggeredRules().forEach(r -> System.out.println("  → " + r));
-        }
+                if (!ruleResult.getTriggeredRules().isEmpty()) {
+                    System.out.println("[RULE ENGINE] Panne " + saved.getFailureCode() + " :");
+                    ruleResult.getTriggeredRules().forEach(r -> System.out.println("  → " + r));
+                }
 
-        return toDTO(saved);
+                return toDTO(saved);
     }
 
     // ── READ ALL avec filtres ─────────────────────────────────
@@ -180,6 +181,25 @@ public class FailureService {
         failure.setStatus(FailureStatus.Closed);
 
         return toDTO(failureRepository.save(failure));
+    }
+    // ── Réévaluation forcée du Rule Engine (V1 + V2 si analyse dispo) ──
+    public FailureResponseDTO reevaluateWithRuleEngine(Long id) {
+        Failure failure = failureRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Panne non trouvée avec l'id : " + id));
+
+        var ruleResult = ruleEngineService.evaluateFailure(failure);
+        failure.setPriority(ruleResult.getComputedPriority());
+        failure.setRuleEngineTriggered(!ruleResult.getTriggeredRules().isEmpty());
+        failure.setRecommendedTechnicianId(ruleResult.getRecommendedTechnicianId());
+        Failure saved = failureRepository.save(failure);
+
+        // ── Applique aussi les règles 5/6 si une analyse LLM existe déjà ──
+        ruleEngineService.applyPostLlmRules(saved);
+
+        Failure refreshed = failureRepository.findById(saved.getId())
+                .orElseThrow(() -> new EntityNotFoundException("Panne non trouvée avec l'id : " + id));
+
+        return toDTO(refreshed);
     }
 
 }

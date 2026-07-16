@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.suprajit.gmao_backend.ai.service.AiAnalysisService;
 import com.suprajit.gmao_backend.entity.PreventiveMaintenance;
 import com.suprajit.gmao_backend.entity.enums.MaintenanceStatus;
 import com.suprajit.gmao_backend.notification.service.NotificationService;
@@ -22,6 +23,7 @@ public class MaintenanceScheduler {
     private final PreventiveMaintenanceRepository pmRepository;
     private final NotificationService notificationService;
     private final WeeklyReportService weeklyReportService;
+    private final AiAnalysisService aiAnalysisService;
 
 
     // ── Tâche principale : chaque jour à 8h30 ───────────────
@@ -109,12 +111,15 @@ public class MaintenanceScheduler {
         // et relancer l'appel Groq API
         System.out.println("[SCHEDULER] TODO Sprint 5 : retry LLM analyses pending");
     }
-    // ── Génération du bilan hebdomadaire : chaque dimanche à 18h ──
     @Scheduled(cron = "0 0 18 * * SUN")
     @Transactional
     public void generateWeeklyReportScheduled() {
         System.out.println("[SCHEDULER] Génération du bilan hebdomadaire...");
-        weeklyReportService.generateWeeklyReport();
+        var report = weeklyReportService.generateWeeklyReport();
         System.out.println("[SCHEDULER] Bilan hebdomadaire généré avec succès.");
+
+        // ── Déclenche la synthèse IA APRÈS que le rapport soit déjà commité ──
+        aiAnalysisService.generateLlmSummary(report.getId());
     }
+    
 }

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.suprajit.gmao_backend.ai.service.AiAnalysisService;
 import com.suprajit.gmao_backend.pdf.service.PdfService;
 import com.suprajit.gmao_backend.weeklyreport.dto.WeeklyReportResponseDTO;
 import com.suprajit.gmao_backend.weeklyreport.service.WeeklyReportService;
@@ -32,6 +33,7 @@ public class WeeklyReportController {
 
     private final WeeklyReportService weeklyReportService;
     private final PdfService pdfService;
+    private final AiAnalysisService aiAnalysisService;
 
     // ── GET /api/weekly-reports ───────────────────────────────
     @Operation(summary = "Lister les bilans hebdomadaires", description = "Ordre décroissant (plus récent en premier).")
@@ -54,11 +56,16 @@ public class WeeklyReportController {
         description = "À supprimer en production — sert uniquement à valider le scheduler sans attendre dimanche 18h."
     )
 
-    @PostMapping("/generate")
+   @PostMapping("/generate")
     @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<WeeklyReportResponseDTO> generateManually() {
-        return ResponseEntity.ok(weeklyReportService.generateWeeklyReport(
-            weeklyReportService.getCurrentUserName()));
+        WeeklyReportResponseDTO report = weeklyReportService.generateWeeklyReport(
+            weeklyReportService.getCurrentUserName());
+
+        // ── Déclenche la synthèse IA (transaction déjà commitée à ce stade) ──
+        aiAnalysisService.generateLlmSummary(report.getId());
+
+        return ResponseEntity.ok(report);
     }
        // ── GET /api/weekly-reports/{id}/pdf ──────────────────────
     @Operation(summary = "Télécharger le PDF du bilan hebdomadaire")
@@ -69,5 +76,16 @@ public class WeeklyReportController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=weekly_report_" + id + ".pdf")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdfBytes);
+    }
+        // ── POST /api/weekly-reports/{id}/generate-summary ────────
+    @Operation(
+        summary = "Générer la synthèse IA d'un bilan hebdomadaire",
+        description = "Déclenche l'analyse LLM en asynchrone (synthèse + recommandations)."
+    )
+    @PostMapping("/{id}/generate-summary")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor')")
+    public ResponseEntity<Void> generateSummary(@PathVariable Long id) {
+        aiAnalysisService.generateLlmSummary(id);
+        return ResponseEntity.accepted().build();
     }
 }

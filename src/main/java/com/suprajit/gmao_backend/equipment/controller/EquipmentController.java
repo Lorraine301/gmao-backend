@@ -1,8 +1,11 @@
 package com.suprajit.gmao_backend.equipment.controller;
 
+import java.io.IOException;
 import java.util.List;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -14,11 +17,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.suprajit.gmao_backend.entity.enums.CriticalityLevel;
 import com.suprajit.gmao_backend.entity.enums.EquipmentStatus;
+import com.suprajit.gmao_backend.equipment.dto.EquipmentImportResultDTO;
 import com.suprajit.gmao_backend.equipment.dto.EquipmentRequestDTO;
 import com.suprajit.gmao_backend.equipment.dto.EquipmentResponseDTO;
+import com.suprajit.gmao_backend.equipment.service.EquipmentImportExportService;
 import com.suprajit.gmao_backend.equipment.service.EquipmentService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,6 +44,7 @@ import lombok.RequiredArgsConstructor;
 public class EquipmentController {
 
     private final EquipmentService equipmentService;
+    private final EquipmentImportExportService importExportService;
 
     // ── POST /api/equipments ────────────────────────────────
     @Operation(
@@ -130,5 +137,47 @@ public class EquipmentController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         equipmentService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+     
+
+    // ── GET /api/equipments/export?format=excel|json ────────
+    @Operation(summary = "Exporter les équipements", description = "Format excel (défaut) ou json.")
+    @GetMapping("/export")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor')")
+    public ResponseEntity<byte[]> export(
+            @RequestParam(defaultValue = "excel") String format) throws IOException {
+
+        byte[] content;
+        String filename;
+        MediaType mediaType;
+
+        if ("json".equalsIgnoreCase(format)) {
+            content = importExportService.exportToJson();
+            filename = "equipements.json";
+            mediaType = MediaType.APPLICATION_JSON;
+        } else {
+            content = importExportService.exportToExcel();
+            filename = "equipements.xlsx";
+            mediaType = MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+                .contentType(mediaType)
+                .body(content);
+    }
+
+    // ── POST /api/equipments/import ──────────────────────────
+    @Operation(
+        summary = "Importer des équipements en masse",
+        description = "Fichier .xlsx ou .json contenant plusieurs équipements. " +
+                      "Les lignes invalides ou en doublon (code déjà existant) sont ignorées, pas bloquantes."
+    )
+    @PostMapping("/import")
+    @PreAuthorize("hasRole('Admin')")
+    public ResponseEntity<EquipmentImportResultDTO> importFile(
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(importExportService.importFile(file));
     }
 }

@@ -18,12 +18,14 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     private final UserRepository userRepository;
 
-    @Override
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+@Override
+public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         return userRepository.findByEmail(email)
                 .map(user -> new org.springframework.security.core.userdetails.User(
                         user.getEmail(),
                         user.getPassword(),
+                        user.getActive(),   // ← enabled : bloque la connexion si false
+                        true, true, true,
                         List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().getName()))
                 ))
                 .orElseThrow(() -> new UsernameNotFoundException("Utilisateur non trouvé : " + email));

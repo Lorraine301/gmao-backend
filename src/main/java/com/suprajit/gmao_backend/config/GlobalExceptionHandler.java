@@ -77,4 +77,17 @@ public class GlobalExceptionHandler {
         body.put("error", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
+    // ── Filet de sécurité : toute exception non prévue passe ICI,
+    // au lieu de remonter au conteneur (ce qui casse les en-têtes CORS) ──
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
+        ex.printStackTrace(); // ← pour voir la vraie cause dans la console pendant qu'on débogue
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now().toString());
+        body.put("status", 500);
+        body.put("error", "Erreur interne : " + ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
 }

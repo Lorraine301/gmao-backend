@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -24,6 +25,7 @@ import com.suprajit.gmao_backend.entity.enums.EquipmentStatus;
 import com.suprajit.gmao_backend.equipment.dto.EquipmentImportResultDTO;
 import com.suprajit.gmao_backend.equipment.dto.EquipmentRequestDTO;
 import com.suprajit.gmao_backend.equipment.dto.EquipmentResponseDTO;
+import com.suprajit.gmao_backend.equipment.dto.EquipmentStatusUpdateDTO;
 import com.suprajit.gmao_backend.equipment.service.EquipmentImportExportService;
 import com.suprajit.gmao_backend.equipment.service.EquipmentService;
 
@@ -180,4 +182,16 @@ public class EquipmentController {
             @RequestParam("file") MultipartFile file) throws IOException {
         return ResponseEntity.ok(importExportService.importFile(file));
     }
+    // ── PATCH /api/equipments/{id}/status ───────────────────
+    @Operation(
+        summary = "Changer rapidement le statut d'un équipement",
+        description = "Modifie uniquement le statut, sans passer par le formulaire complet."
+    )
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('Admin')")
+    public ResponseEntity<EquipmentResponseDTO> updateStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody EquipmentStatusUpdateDTO dto) {
+        return ResponseEntity.ok(equipmentService.updateStatus(id, dto.getStatus()));
+    }   
 }

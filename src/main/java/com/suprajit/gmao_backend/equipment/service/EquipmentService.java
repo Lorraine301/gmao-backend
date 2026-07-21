@@ -135,4 +135,13 @@ public class EquipmentService {
         }
         equipmentRepository.deleteById(id);
     }
+    // ── Changement de statut rapide (sans repasser par le formulaire complet) ──
+    public EquipmentResponseDTO updateStatus(Long id, EquipmentStatus status) {
+        Equipment equipment = equipmentRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(
+                    "Équipement non trouvé avec l'id : " + id));
+
+        equipment.setStatus(status);
+        return toDTO(equipmentRepository.save(equipment));
+    }
 }

@@ -28,6 +28,7 @@ import com.suprajit.gmao_backend.equipment.dto.EquipmentResponseDTO;
 import com.suprajit.gmao_backend.equipment.dto.EquipmentStatusUpdateDTO;
 import com.suprajit.gmao_backend.equipment.service.EquipmentImportExportService;
 import com.suprajit.gmao_backend.equipment.service.EquipmentService;
+import com.suprajit.gmao_backend.pdf.service.PdfService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -47,6 +48,8 @@ public class EquipmentController {
 
     private final EquipmentService equipmentService;
     private final EquipmentImportExportService importExportService;
+    private final PdfService pdfService;
+
 
     // ── POST /api/equipments ────────────────────────────────
     @Operation(
@@ -193,5 +196,20 @@ public class EquipmentController {
             @PathVariable Long id,
             @Valid @RequestBody EquipmentStatusUpdateDTO dto) {
         return ResponseEntity.ok(equipmentService.updateStatus(id, dto.getStatus()));
-    }   
+    } 
+    
+    // ── GET /api/equipments/{id}/datasheet ───────────────────
+    @Operation(
+        summary = "Télécharger la fiche technique PDF d'un équipement",
+        description = "Inclut les informations générales, l'état, et l'historique des pannes des 90 derniers jours."
+    )
+    @GetMapping("/{id}/datasheet")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor') or hasRole('Technician')")
+    public ResponseEntity<byte[]> getDatasheet(@PathVariable Long id) throws IOException {
+        byte[] pdfBytes = pdfService.generateEquipmentDatasheet(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=fiche_equipement_" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdfBytes);
+    }
 }

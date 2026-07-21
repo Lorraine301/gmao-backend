@@ -42,6 +42,7 @@ import com.suprajit.gmao_backend.entity.Failure;
 import com.suprajit.gmao_backend.entity.Intervention;
 import com.suprajit.gmao_backend.entity.WeeklyReport;
 import com.suprajit.gmao_backend.entity.enums.InterventionStatus;
+import com.suprajit.gmao_backend.repository.EquipmentRepository;
 import com.suprajit.gmao_backend.repository.FailureRepository;
 import com.suprajit.gmao_backend.repository.InterventionRepository;
 import com.suprajit.gmao_backend.repository.WeeklyReportRepository;
@@ -63,6 +64,9 @@ public class PdfService {
     private final WeeklyReportRepository weeklyReportRepository;
     private final FailureRepository failureRepository;
     private final RuleEngineService ruleEngineService;
+    private final EquipmentRepository equipmentRepository;
+    private final PdfBrandingHelper brandingHelper; 
+    
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final String REPORTS_DIR = "reports/interventions";
@@ -488,6 +492,105 @@ public class PdfService {
                     topTable.addCell(bodyCell(String.valueOf(entry.getValue())));
                 }
                 document.add(topTable);
+            }
+
+            buildFooter(document, pdfDoc);
+        }
+
+        return baos.toByteArray();
+    }
+    // ══════════════════════════════════════════════════════════
+    // Fiche technique équipement
+    // ══════════════════════════════════════════════════════════
+
+    public byte[] generateEquipmentDatasheet(Long equipmentId) throws IOException {
+        Equipment equipment = equipmentRepository.findById(equipmentId)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Équipement non trouvé avec l'id : " + equipmentId));
+
+        List<Failure> recentFailures = failureRepository.findByReportedAtBetween(
+                LocalDateTime.now().minusDays(90), LocalDateTime.now())
+                .stream()
+                .filter(f -> f.getEquipment().getId().equals(equipmentId))
+                .sorted((a, b) -> b.getReportedAt().compareTo(a.getReportedAt()))
+                .limit(10)
+                .toList();
+
+        Double avgMttr = interventionRepository.findAverageMttrByEquipment(equipmentId);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (PdfWriter writer = new PdfWriter(baos);
+             PdfDocument pdfDoc = new PdfDocument(writer);
+             Document document = new Document(pdfDoc)) {
+
+            brandingHelper.buildBrandedHeader(document,
+                    "Fiche technique — " + equipment.getCode(),
+                    equipment.getName(),
+                    "Généré le : " + LocalDateTime.now().format(DATE_FORMAT));
+
+            addSectionTitle(document, "Informations générales");
+            Table infoTable = createInfoTable();
+            addRow(infoTable, "Code", equipment.getCode());
+            addRow(infoTable, "Nom", equipment.getName());
+            addRow(infoTable, "Type", equipment.getType());
+            addRow(infoTable, "Catégorie", equipment.getCategory());
+            addRow(infoTable, "Numéro de série", equipment.getSerialNumber());
+            addRow(infoTable, "Fabricant", equipment.getManufacturer());
+            addRow(infoTable, "Modèle", equipment.getModel());
+            document.add(infoTable);
+
+            addSectionTitle(document, "Localisation");
+            Table locationTable = createInfoTable();
+            addRow(locationTable, "Site", equipment.getPlant());
+            addRow(locationTable, "Ligne de production", equipment.getProductionLine());
+            addRow(locationTable, "Emplacement", equipment.getLocation());
+            document.add(locationTable);
+
+            addSectionTitle(document, "État & Maintenance");
+            Table stateTable = createInfoTable();
+            addRow(stateTable, "Statut", equipment.getStatus() != null ? equipment.getStatus().name() : null);
+            addRow(stateTable, "Criticité", equipment.getCriticalityLevel() != null
+                    ? equipment.getCriticalityLevel().name() : null);
+            addRow(stateTable, "Équipe de maintenance", equipment.getMaintenanceTeam());
+            addRow(stateTable, "Date d'installation", equipment.getInstallationDate() != null
+                    ? equipment.getInstallationDate().toString() : null);
+            addRow(stateTable, "Date de mise en service", equipment.getCommissioningDate() != null
+                    ? equipment.getCommissioningDate().toString() : null);
+            addRow(stateTable, "MTTR moyen", avgMttr != null
+                    ? String.format("%.1f h", avgMttr) : "Non disponible");
+            document.add(stateTable);
+
+            if (equipment.getDescription() != null && !equipment.getDescription().isBlank()) {
+                addSectionTitle(document, "Description");
+                document.add(new Paragraph(equipment.getDescription()).setFontSize(10).setMarginBottom(10));
+            }
+
+            if (equipment.getNotes() != null && !equipment.getNotes().isBlank()) {
+                addSectionTitle(document, "Notes");
+                document.add(new Paragraph(equipment.getNotes()).setFontSize(10).setMarginBottom(10));
+            }
+
+            addSectionTitle(document, "Historique récent des pannes (90 derniers jours)");
+            if (recentFailures.isEmpty()) {
+                document.add(new Paragraph("Aucune panne signalée sur cette période.")
+                        .setFontSize(10).setItalic().setFontColor(ColorConstants.GRAY));
+            } else {
+                Table failuresTable = new Table(UnitValue.createPercentArray(new float[]{15, 35, 20, 15, 15}))
+                        .useAllAvailableWidth().setMarginBottom(10);
+                failuresTable.addHeaderCell(headerCell("Code"));
+                failuresTable.addHeaderCell(headerCell("Titre"));
+                failuresTable.addHeaderCell(headerCell("Date"));
+                failuresTable.addHeaderCell(headerCell("Priorité"));
+                failuresTable.addHeaderCell(headerCell("Statut"));
+
+                for (Failure f : recentFailures) {
+                    failuresTable.addCell(bodyCell(f.getFailureCode()));
+                    failuresTable.addCell(bodyCell(f.getTitle()));
+                    failuresTable.addCell(bodyCell(f.getReportedAt().format(DATE_FORMAT)));
+                    failuresTable.addCell(bodyCell(f.getPriority() != null ? f.getPriority().name() : "—"));
+                    failuresTable.addCell(bodyCell(f.getStatus() != null ? f.getStatus().name() : "—"));
+                }
+                document.add(failuresTable);
             }
 
             buildFooter(document, pdfDoc);

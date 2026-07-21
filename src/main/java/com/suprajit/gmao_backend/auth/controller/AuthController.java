@@ -1,11 +1,23 @@
 package com.suprajit.gmao_backend.auth.controller;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.suprajit.gmao_backend.auth.dto.ChangePasswordDTO;
 import com.suprajit.gmao_backend.auth.dto.LoginRequest;
 import com.suprajit.gmao_backend.auth.dto.LoginResponse;
 import com.suprajit.gmao_backend.auth.dto.UserProfileResponse;
 import com.suprajit.gmao_backend.auth.service.AuthService;
 import com.suprajit.gmao_backend.entity.User;
 import com.suprajit.gmao_backend.repository.UserRepository;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,11 +25,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -74,4 +83,18 @@ public class AuthController {
                 .availabilityStatus(user.getAvailabilityStatus())
                 .build());
     }
+    @Operation(
+        summary = "Changer son propre mot de passe",
+        description = "Nécessite l'ancien mot de passe pour confirmation.",
+        security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Mot de passe changé avec succès"),
+        @ApiResponse(responseCode = "400", description = "Ancien mot de passe incorrect ou nouveau mot de passe invalide")
+    })
+    @PutMapping("/change-password")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordDTO dto) {
+        authService.changePassword(dto);
+        return ResponseEntity.noContent().build();
+    }   
 }

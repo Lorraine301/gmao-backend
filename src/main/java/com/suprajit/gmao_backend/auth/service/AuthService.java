@@ -1,5 +1,6 @@
 package com.suprajit.gmao_backend.auth.service;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,8 +28,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;      
 
-    public LoginResponse login(LoginRequest request) {
-        // Spring Security vérifie email + password (BCrypt) automatiquement
+   public LoginResponse login(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
@@ -36,7 +36,10 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("Utilisateur non trouvé"));
 
-        // Générer le token avec claims supplémentaires
+        // ── Mise à jour de la dernière connexion ──
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+
         String token = jwtService.generateToken(
                 new org.springframework.security.core.userdetails.User(
                         user.getEmail(), user.getPassword(), java.util.List.of()),
@@ -50,7 +53,7 @@ public class AuthService {
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .build();
-    }
+    }   
     // ── Changer son propre mot de passe (utilisateur connecté) ──
     public void changePassword(ChangePasswordDTO dto) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();

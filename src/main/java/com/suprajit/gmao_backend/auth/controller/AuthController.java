@@ -81,6 +81,7 @@ public class AuthController {
                 .role(user.getRole().getName())
                 .speciality(user.getSpeciality())
                 .availabilityStatus(user.getAvailabilityStatus())
+                .lastLoginAt(user.getLastLoginAt())
                 .build());
     }
     @Operation(

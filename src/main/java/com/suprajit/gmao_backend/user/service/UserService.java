@@ -37,6 +37,7 @@ public class UserService {
                 .active(u.getActive())
                 .createdAt(u.getCreatedAt())
                 .updatedAt(u.getUpdatedAt())
+                .lastLoginAt(u.getLastLoginAt())
                 .build();
     }
 

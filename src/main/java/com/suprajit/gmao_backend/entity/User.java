@@ -64,4 +64,6 @@ public class User {
     @Column(nullable = false, columnDefinition = "TINYINT(1) DEFAULT 1")
     @Builder.Default
     private Boolean active = true;
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
 }

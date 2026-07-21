@@ -3,6 +3,7 @@ package com.suprajit.gmao_backend.notification.service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final SimpMessagingTemplate messagingTemplate;      
 
     // ── Mapper ──────────────────────────────────────────────
     private NotificationResponseDTO toDTO(Notification n) {
@@ -41,12 +43,13 @@ public class NotificationService {
     }
 
     // ── Créer une notification pour un utilisateur ──────────
+ // ── Créer une notification pour un utilisateur ──────────
     public void create(Long userId, String type, String message,
                        String entityType, Long entityId) {
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) return;
 
-        notificationRepository.save(Notification.builder()
+        Notification saved = notificationRepository.save(Notification.builder()
                 .user(user)
                 .type(type)
                 .message(message)
@@ -55,15 +58,21 @@ public class NotificationService {
                 .status("Unread")
                 .notificationDate(LocalDateTime.now())
                 .build());
+
+        // ── Push en temps réel via WebSocket ──
+        messagingTemplate.convertAndSendToUser(
+                userId.toString(), "/queue/notifications", toDTO(saved));
     }
 
+    
     // ── Notifier tous les Admins et Superviseurs ─────────────
+// ── Notifier tous les Admins et Superviseurs ─────────────
     public void notifyAdminsAndSupervisors(String type, String message,
                                             String entityType, Long entityId) {
         List<User> targets = userRepository.findByRole_NameIn(
                 List.of("Admin", "Supervisor"));
         for (User user : targets) {
-            notificationRepository.save(Notification.builder()
+            Notification saved = notificationRepository.save(Notification.builder()
                     .user(user)
                     .type(type)
                     .message(message)
@@ -72,9 +81,11 @@ public class NotificationService {
                     .status("Unread")
                     .notificationDate(LocalDateTime.now())
                     .build());
+
+            messagingTemplate.convertAndSendToUser(
+                    user.getId().toString(), "/queue/notifications", toDTO(saved));
         }
     }
-
     // ── Notifications de l'utilisateur connecté ──────────────
     public List<NotificationResponseDTO> findForCurrentUser() {
         String email = SecurityContextHolder.getContext()

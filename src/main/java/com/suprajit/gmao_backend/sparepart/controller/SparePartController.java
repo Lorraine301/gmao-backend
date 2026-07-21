@@ -1,8 +1,11 @@
 package com.suprajit.gmao_backend.sparepart.controller;
 
+import java.io.IOException;
 import java.util.List;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +22,7 @@ import com.suprajit.gmao_backend.sparepart.dto.PartConsumptionResponseDTO;
 import com.suprajit.gmao_backend.sparepart.dto.PreventiveMaintenancePartResponseDTO;
 import com.suprajit.gmao_backend.sparepart.dto.SparePartRequestDTO;
 import com.suprajit.gmao_backend.sparepart.dto.SparePartResponseDTO;
+import com.suprajit.gmao_backend.sparepart.service.ConsumptionExportService;
 import com.suprajit.gmao_backend.sparepart.service.SparePartService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +41,7 @@ import lombok.RequiredArgsConstructor;
 public class SparePartController {
 
     private final SparePartService sparePartService;
+    private final ConsumptionExportService consumptionExportService;
 
     // ── GET /api/spare-parts ──────────────────────────────────
     @Operation(
@@ -138,5 +143,36 @@ public class SparePartController {
     public ResponseEntity<List<PreventiveMaintenancePartResponseDTO>> getPartsByMaintenance(
             @PathVariable Long maintenanceId) {
         return ResponseEntity.ok(sparePartService.findPartsByPreventiveMaintenance(maintenanceId));
+    }
+      // ── GET /api/spare-parts/consumption-history/export ──────
+    @Operation(
+        summary = "Exporter l'historique de consommation",
+        description = "Format excel (défaut) ou pdf. Filtre optionnel ?type=CORRECTIVE ou PREVENTIVE"
+    )
+    @GetMapping("/api/spare-parts/consumption-history/export")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor')")
+    public ResponseEntity<byte[]> exportConsumptionHistory(
+            @RequestParam(required = false) String type,
+            @RequestParam(defaultValue = "excel") String format) throws IOException {
+
+        byte[] content;
+        String filename;
+        MediaType mediaType;
+
+        if ("pdf".equalsIgnoreCase(format)) {
+            content = consumptionExportService.exportToPdf(type);
+            filename = "historique_consommation.pdf";
+            mediaType = MediaType.APPLICATION_PDF;
+        } else {
+            content = consumptionExportService.exportToExcel(type);
+            filename = "historique_consommation.xlsx";
+            mediaType = MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+                .contentType(mediaType)
+                .body(content);
     }
 }

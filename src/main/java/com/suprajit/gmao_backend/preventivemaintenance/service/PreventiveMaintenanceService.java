@@ -11,13 +11,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.suprajit.gmao_backend.entity.Equipment;
 import com.suprajit.gmao_backend.entity.PreventiveMaintenance;
+import com.suprajit.gmao_backend.entity.PreventiveMaintenanceHistory;
 import com.suprajit.gmao_backend.entity.User;
 import com.suprajit.gmao_backend.entity.enums.ExecutionStatus;
 import com.suprajit.gmao_backend.entity.enums.MaintenanceStatus;
 import com.suprajit.gmao_backend.notification.service.NotificationService;
+import com.suprajit.gmao_backend.preventivemaintenance.dto.PreventiveMaintenanceHistoryResponseDTO;
 import com.suprajit.gmao_backend.preventivemaintenance.dto.PreventiveMaintenanceRequestDTO;
 import com.suprajit.gmao_backend.preventivemaintenance.dto.PreventiveMaintenanceResponseDTO;
 import com.suprajit.gmao_backend.repository.EquipmentRepository;
+import com.suprajit.gmao_backend.repository.PreventiveMaintenanceHistoryRepository;
 import com.suprajit.gmao_backend.repository.PreventiveMaintenanceRepository;
 import com.suprajit.gmao_backend.repository.UserRepository;
 import com.suprajit.gmao_backend.sparepart.dto.ConsumeStockRequestDTO;
@@ -36,6 +39,7 @@ public class PreventiveMaintenanceService {
     private final UserRepository userRepository;
     private final SparePartService sparePartService;
     private final NotificationService notificationService;
+    private final PreventiveMaintenanceHistoryRepository historyRepository;     
 
     // ── Mapper entité → DTO ─────────────────────────────────
     private PreventiveMaintenanceResponseDTO toDTO(PreventiveMaintenance pm) {
@@ -189,7 +193,8 @@ public class PreventiveMaintenanceService {
         return toDTO(pmRepository.save(pm));
     }
 
-    // ── Clôturer (technicien) : problème/solution/pièces optionnels ──
+ // ── Clôturer (technicien) : archive le cycle + réinitialise pour le prochain
+    // SAUF si maintenance "Urgente" (créée par la Règle 6) : ponctuelle, jamais récurrente ──
     public PreventiveMaintenanceResponseDTO completeByTechnician(Long id,
             String problemFound, String solution, List<ConsumeStockRequestDTO> parts) {
 
@@ -197,31 +202,93 @@ public class PreventiveMaintenanceService {
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Maintenance non trouvée avec l'id : " + id));
 
-        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
 
-        pm.setProblemFound(problemFound);
-        pm.setSolution(solution);
-        pm.setExecutionStatus(ExecutionStatus.Completed);
-        pm.setTechnicianEndTime(LocalDateTime.now());
+        // ── 1. Archive ce cycle dans l'historique (dans tous les cas) ──
+        PreventiveMaintenanceHistory history = PreventiveMaintenanceHistory.builder()
+                .equipment(pm.getEquipment())
+                .technician(pm.getAssignedTechnician())
+                .maintenanceType(pm.getMaintenanceType())
+                .completedAt(now)
+                .problemFound(problemFound)
+                .solution(solution)
+                .build();
+        history = historyRepository.save(history);
 
-        pm.setLastMaintenanceDate(today);
-        pm.setNextMaintenanceDate(today.plusDays(pm.getFrequencyDays()));
-        pm.setNextReminderDate(today.plusDays(pm.getFrequencyDays()).minusDays(7));
-        pm.setStatus(MaintenanceStatus.Completed);
-
-        PreventiveMaintenance saved = pmRepository.save(pm);
-
+        // ── 2. Enregistre les pièces utilisées, liées à ce cycle précis ──
         if (parts != null && !parts.isEmpty()) {
-            sparePartService.addPartsToPreventiveMaintenance(saved.getId(), parts);
+            sparePartService.addPartsToPreventiveMaintenance(pm.getId(), history.getId(), parts);
         }
 
-        return toDTO(saved);
-    }
-        // ── Archives (technicien connecté) ──────────────────────
-        public List<PreventiveMaintenanceResponseDTO> findMyArchive(Long technicianId) {
-        return pmRepository
-                .findByAssignedTechnicianIdAndExecutionStatus(technicianId, ExecutionStatus.Completed)
-                .stream().map(this::toDTO).toList();
+        boolean isOneOffUrgent = "Urgente".equals(pm.getMaintenanceType());
+
+        if (isOneOffUrgent) {
+            // ── Maintenance ponctuelle (Règle 6) : clôture définitive, pas de récurrence ──
+            pm.setExecutionStatus(ExecutionStatus.Completed);
+            pm.setStatus(MaintenanceStatus.Completed);
+            pm.setTechnicianEndTime(now);
+            // On garde le technicien, les dates et le problème/solution tels quels :
+            // c'est un événement isolé, son historique complet reste visible sur cette ligne aussi.
+
+        } else {
+            // ── Cycle récurrent normal : réinitialise pour la prochaine échéance ──
+            LocalDate today = LocalDate.now();
+
+            pm.setLastMaintenanceDate(today);
+            pm.setNextMaintenanceDate(today.plusDays(pm.getFrequencyDays()));
+            pm.setNextReminderDate(today.plusDays(pm.getFrequencyDays()).minusDays(7));
+            pm.setStatus(MaintenanceStatus.Scheduled);
+
+            pm.setAssignedTechnician(null);
+            pm.setAssignedBy(null);
+            pm.setExecutionStatus(null);
+            pm.setProblemFound(null);
+            pm.setSolution(null);
+            pm.setTechnicianStartTime(null);
+            pm.setTechnicianEndTime(null);
         }
+
+        return toDTO(pmRepository.save(pm));
+    }
+
+    // ── Historique des maintenances, filtrable par équipement ──
+    public List<PreventiveMaintenanceHistoryResponseDTO> findHistory(Long equipmentId) {
+        List<PreventiveMaintenanceHistory> history = equipmentId != null
+                ? historyRepository.findByEquipmentIdOrderByCompletedAtDesc(equipmentId)
+                : historyRepository.findAllByOrderByCompletedAtDesc();
+
+        return history.stream()
+                .map(h -> PreventiveMaintenanceHistoryResponseDTO.builder()
+                        .id(h.getId())
+                        .equipmentId(h.getEquipment().getId())
+                        .equipmentCode(h.getEquipment().getCode())
+                        .equipmentName(h.getEquipment().getName())
+                        .technicianId(h.getTechnician() != null ? h.getTechnician().getId() : null)
+                        .technicianName(h.getTechnician() != null ? h.getTechnician().getFullName() : null)
+                        .maintenanceType(h.getMaintenanceType())
+                        .completedAt(h.getCompletedAt())
+                        .problemFound(h.getProblemFound())
+                        .solution(h.getSolution())
+                        .build())
+                .toList();
+    } 
     
+    // ── Archives du technicien connecté (basé sur l'historique) ──
+    public List<PreventiveMaintenanceHistoryResponseDTO> findMyArchive(Long technicianId) {
+        return historyRepository.findByTechnicianIdOrderByCompletedAtDesc(technicianId)
+                .stream()
+                .map(h -> PreventiveMaintenanceHistoryResponseDTO.builder()
+                        .id(h.getId())
+                        .equipmentId(h.getEquipment().getId())
+                        .equipmentCode(h.getEquipment().getCode())
+                        .equipmentName(h.getEquipment().getName())
+                        .technicianId(h.getTechnician() != null ? h.getTechnician().getId() : null)
+                        .technicianName(h.getTechnician() != null ? h.getTechnician().getFullName() : null)
+                        .maintenanceType(h.getMaintenanceType())
+                        .completedAt(h.getCompletedAt())
+                        .problemFound(h.getProblemFound())
+                        .solution(h.getSolution())
+                        .build())
+                .toList();
+    }
 }

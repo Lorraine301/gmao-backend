@@ -11,13 +11,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.suprajit.gmao_backend.preventivemaintenance.dto.AssignTechnicianRequestDTO;
 import com.suprajit.gmao_backend.preventivemaintenance.dto.CompletePreventiveMaintenanceDTO;
+import com.suprajit.gmao_backend.preventivemaintenance.dto.PreventiveMaintenanceHistoryResponseDTO;
 import com.suprajit.gmao_backend.preventivemaintenance.dto.PreventiveMaintenanceRequestDTO;
 import com.suprajit.gmao_backend.preventivemaintenance.dto.PreventiveMaintenanceResponseDTO;
 import com.suprajit.gmao_backend.preventivemaintenance.service.PreventiveMaintenanceService;
+import com.suprajit.gmao_backend.sparepart.dto.PreventiveMaintenancePartResponseDTO;
+import com.suprajit.gmao_backend.sparepart.service.SparePartService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -36,6 +40,7 @@ import lombok.RequiredArgsConstructor;
 public class PreventiveMaintenanceController {
 
     private final PreventiveMaintenanceService pmService;
+    private final SparePartService sparePartService;
 
     // ── POST /api/preventive-maintenances ────────────────────
     @Operation(
@@ -150,8 +155,27 @@ public class PreventiveMaintenanceController {
     @Operation(summary = "Mes maintenances préventives terminées (archives)")
     @GetMapping("/my/archive")
     @PreAuthorize("hasRole('Technician')")
-    public ResponseEntity<List<PreventiveMaintenanceResponseDTO>> findMyArchive() {
+    public ResponseEntity<List<PreventiveMaintenanceHistoryResponseDTO>> findMyArchive() {
         Long currentUserId = pmService.getCurrentUserId();
         return ResponseEntity.ok(pmService.findMyArchive(currentUserId));
     }
+    // ── GET /api/preventive-maintenances/history ─────────────
+    @Operation(
+        summary = "Historique des maintenances préventives réalisées",
+        description = "Filtre optionnel par équipement : ?equipmentId="
+    )
+    @GetMapping("/history")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor')")
+    public ResponseEntity<List<PreventiveMaintenanceHistoryResponseDTO>> getHistory(
+            @RequestParam(required = false) Long equipmentId) {
+        return ResponseEntity.ok(pmService.findHistory(equipmentId));
+    }
+    // ── GET /api/preventive-maintenances/history/{historyId}/parts ──
+    @Operation(summary = "Pièces utilisées lors d'un cycle historique précis")
+    @GetMapping("/history/{historyId}/parts")
+    @PreAuthorize("hasRole('Admin') or hasRole('Supervisor') or hasRole('Technician')")
+    public ResponseEntity<List<PreventiveMaintenancePartResponseDTO>> getPartsByHistory(
+            @PathVariable Long historyId) {
+        return ResponseEntity.ok(sparePartService.findPartsByHistory(historyId));
+    }   
 }

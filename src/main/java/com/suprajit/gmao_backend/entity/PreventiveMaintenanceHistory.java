@@ -19,30 +19,38 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "preventive_maintenance_parts")
-@Data @NoArgsConstructor @AllArgsConstructor @Builder
-public class PreventiveMaintenancePart {
+@Table(name = "preventive_maintenance_history")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class PreventiveMaintenanceHistory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "preventive_maintenance_id", nullable = false)
-    private PreventiveMaintenance preventiveMaintenance;
+    @JoinColumn(name = "equipment_id", nullable = false)
+    private Equipment equipment;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "spare_part_id", nullable = false)
-    private SparePart sparePart;
+    @JoinColumn(name = "technician_id")
+    private User technician;
 
-    @Column(name = "quantity_used", nullable = false)
-    private Integer quantityUsed;
+    @Column(name = "maintenance_type", length = 100)
+    private String maintenanceType;
+
+    @Column(name = "completed_at", nullable = false)
+    private LocalDateTime completedAt;
+
+    @Column(name = "problem_found", columnDefinition = "TEXT")
+    private String problemFound;
+
+    @Column(columnDefinition = "TEXT")
+    private String solution;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "history_id")
-    private PreventiveMaintenanceHistory history;   // nullable — rempli au moment de la clôture
 }

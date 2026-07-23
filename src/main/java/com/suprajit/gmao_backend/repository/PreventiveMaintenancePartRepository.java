@@ -10,4 +10,5 @@ import com.suprajit.gmao_backend.entity.PreventiveMaintenancePart;
 public interface PreventiveMaintenancePartRepository
         extends JpaRepository<PreventiveMaintenancePart, Long> {
                 List<PreventiveMaintenancePart> findByPreventiveMaintenanceId(Long preventiveMaintenanceId);
+                List<PreventiveMaintenancePart> findByHistoryId(Long historyId);
 }

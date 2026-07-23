@@ -9,11 +9,13 @@ import org.springframework.transaction.annotation.Transactional;
 import com.suprajit.gmao_backend.entity.Intervention;
 import com.suprajit.gmao_backend.entity.InterventionPart;
 import com.suprajit.gmao_backend.entity.PreventiveMaintenance;
+import com.suprajit.gmao_backend.entity.PreventiveMaintenanceHistory;
 import com.suprajit.gmao_backend.entity.PreventiveMaintenancePart;
 import com.suprajit.gmao_backend.entity.SparePart;
 import com.suprajit.gmao_backend.notification.service.NotificationService;
 import com.suprajit.gmao_backend.repository.InterventionPartRepository;
 import com.suprajit.gmao_backend.repository.InterventionRepository;
+import com.suprajit.gmao_backend.repository.PreventiveMaintenanceHistoryRepository;
 import com.suprajit.gmao_backend.repository.PreventiveMaintenancePartRepository;
 import com.suprajit.gmao_backend.repository.PreventiveMaintenanceRepository;
 import com.suprajit.gmao_backend.repository.SparePartRepository;
@@ -40,6 +42,7 @@ public class SparePartService {
 
     private final PreventiveMaintenanceRepository preventiveMaintenanceRepository;
     private final PreventiveMaintenancePartRepository preventiveMaintenancePartRepository;
+    private final PreventiveMaintenanceHistoryRepository preventiveMaintenanceHistoryRepository;    
 
     // ── Mapper ──────────────────────────────────────────────
     private SparePartResponseDTO toDTO(SparePart s) {
@@ -184,7 +187,8 @@ public class SparePartService {
     // ── CONSUME STOCK (via maintenance préventive) ──────────
     // Duplication volontaire de addPartsToIntervention() : isolation totale
     // du flux panne (intervention_parts), zéro risque de régression.
-    public void addPartsToPreventiveMaintenance(Long preventiveMaintenanceId,
+    // ── CONSUME STOCK (via maintenance préventive) ──────────
+    public void addPartsToPreventiveMaintenance(Long preventiveMaintenanceId, Long historyId,
             List<ConsumeStockRequestDTO> parts) {
 
         if (parts == null || parts.isEmpty()) return;
@@ -192,6 +196,10 @@ public class SparePartService {
         PreventiveMaintenance pm = preventiveMaintenanceRepository.findById(preventiveMaintenanceId)
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Maintenance non trouvée avec l'id : " + preventiveMaintenanceId));
+
+        PreventiveMaintenanceHistory history = historyId != null
+                ? preventiveMaintenanceHistoryRepository.findById(historyId).orElse(null)
+                : null;
 
         for (ConsumeStockRequestDTO partRequest : parts) {
             SparePart sparePart = sparePartRepository.findById(partRequest.getSparePartId())
@@ -218,18 +226,34 @@ public class SparePartService {
                 notificationService.notifyAdminsAndSupervisors(
                     "Warning", alertMessage, "SparePart", sparePart.getId()
                 );
-                System.out.println("[STOCK] Alerte stock faible : " + sparePart.getReference());
             }
 
             preventiveMaintenancePartRepository.save(
                 PreventiveMaintenancePart.builder()
                     .preventiveMaintenance(pm)
+                    .history(history)
                     .sparePart(sparePart)
                     .quantityUsed(partRequest.getQuantityUsed())
                     .build()
             );
         }
     }
+
+    // ── Pièces utilisées pour un cycle historique donné ──────
+    public List<PreventiveMaintenancePartResponseDTO> findPartsByHistory(Long historyId) {
+        return preventiveMaintenancePartRepository.findByHistoryId(historyId).stream()
+                .map(pmp -> PreventiveMaintenancePartResponseDTO.builder()
+                        .id(pmp.getId())
+                        .preventiveMaintenanceId(pmp.getPreventiveMaintenance().getId())
+                        .sparePartId(pmp.getSparePart().getId())
+                        .sparePartName(pmp.getSparePart().getName())
+                        .sparePartReference(pmp.getSparePart().getReference())
+                        .quantityUsed(pmp.getQuantityUsed())
+                        .createdAt(pmp.getCreatedAt())
+                        .build())
+                .toList();
+    }   
+
     // ── HISTORIQUE DE CONSOMMATION (pannes + maintenance préventive) ──
     public List<PartConsumptionResponseDTO> getConsumptionHistory(String type) {
         List<PartConsumptionResponseDTO> result = new java.util.ArrayList<>();
@@ -282,8 +306,9 @@ public class SparePartService {
                         .unitPrice(unitPrice)
                         .totalPrice(total)
                         .consumptionType("PREVENTIVE")
-                        .technicianName(pm.getAssignedTechnician() != null
-                                ? pm.getAssignedTechnician().getFullName() : null)
+                        .technicianName(pmp.getHistory() != null && pmp.getHistory().getTechnician() != null
+                        ? pmp.getHistory().getTechnician().getFullName()
+                        : (pm.getAssignedTechnician() != null ? pm.getAssignedTechnician().getFullName() : null))
                         .equipmentCode(pm.getEquipment().getCode())
                         .equipmentName(pm.getEquipment().getName())
                         .build());

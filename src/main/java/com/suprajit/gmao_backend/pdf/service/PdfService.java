@@ -7,16 +7,9 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.Month;
 import java.time.format.DateTimeFormatter;
-import java.time.format.TextStyle;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
@@ -40,11 +33,12 @@ import com.itextpdf.layout.properties.UnitValue;
 import com.suprajit.gmao_backend.entity.Equipment;
 import com.suprajit.gmao_backend.entity.Failure;
 import com.suprajit.gmao_backend.entity.Intervention;
+import com.suprajit.gmao_backend.entity.MonthlyReport;
 import com.suprajit.gmao_backend.entity.WeeklyReport;
-import com.suprajit.gmao_backend.entity.enums.InterventionStatus;
 import com.suprajit.gmao_backend.repository.EquipmentRepository;
 import com.suprajit.gmao_backend.repository.FailureRepository;
 import com.suprajit.gmao_backend.repository.InterventionRepository;
+import com.suprajit.gmao_backend.repository.MonthlyReportRepository;
 import com.suprajit.gmao_backend.repository.WeeklyReportRepository;
 import com.suprajit.gmao_backend.ruleengine.dto.AtRiskEquipmentDTO;
 import com.suprajit.gmao_backend.ruleengine.service.RuleEngineService;
@@ -66,6 +60,7 @@ public class PdfService {
     private final RuleEngineService ruleEngineService;
     private final EquipmentRepository equipmentRepository;
     private final PdfBrandingHelper brandingHelper; 
+    private final MonthlyReportRepository monthlyReportRepository;
     
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -423,84 +418,73 @@ public class PdfService {
     }
 
     // ══════════════════════════════════════════════════════════
-    // Bilan mensuel (généré à la volée, non persisté)
+    // Bilan mensuel (généré à la volé et persisté)
     // ══════════════════════════════════════════════════════════
+      private static final String MONTHLY_REPORTS_DIR = "reports/monthly";
 
-    public byte[] generateMonthlyReportBytes(int month, int year) throws IOException {
-        LocalDate startDate = LocalDate.of(year, month, 1);
-        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
-        LocalDateTime start = startDate.atStartOfDay();
-        LocalDateTime end = endDate.atTime(23, 59, 59);
+    // ── Génère le PDF du bilan mensuel à partir de l'entité persistée ──
+    public String generateMonthlyReportPdf(MonthlyReport report) throws IOException {
+        Path dirPath = Paths.get(MONTHLY_REPORTS_DIR);
+        Files.createDirectories(dirPath);
 
-        List<Failure> monthFailures = failureRepository.findByReportedAtBetween(start, end);
-        List<Intervention> monthInterventions = interventionRepository.findByStartTimeBetween(start, end);
+        String filePath = MONTHLY_REPORTS_DIR + "/monthly_" + report.getMonth() + "_" + report.getYear() + ".pdf";
 
-        List<Double> durations = monthInterventions.stream()
-                .filter(i -> i.getStatus() == InterventionStatus.Completed)
-                .map(Intervention::getDuration)
-                .filter(Objects::nonNull)
-                .toList();
-
-        Double avgMttr = durations.isEmpty() ? null
-                : durations.stream().mapToDouble(Double::doubleValue).average().getAsDouble();
-
-        Map<Long, Long> countByEquipmentId = monthFailures.stream()
-                .collect(Collectors.groupingBy(f -> f.getEquipment().getId(), Collectors.counting()));
-        Map<Long, Equipment> equipmentById = monthFailures.stream()
-                .map(Failure::getEquipment)
-                .collect(Collectors.toMap(Equipment::getId, e -> e, (a, b) -> a));
-
-        List<Map.Entry<Long, Long>> top3 = countByEquipmentId.entrySet().stream()
-                .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
-                .limit(3)
-                .toList();
-
-        String monthName = Month.of(month).getDisplayName(TextStyle.FULL, Locale.FRENCH);
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (PdfWriter writer = new PdfWriter(baos);
+        try (PdfWriter writer = new PdfWriter(filePath);
              PdfDocument pdfDoc = new PdfDocument(writer);
              Document document = new Document(pdfDoc)) {
 
+            String monthName = java.time.Month.of(report.getMonth())
+                    .getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.FRENCH);
             String capitalizedMonth = monthName.substring(0, 1).toUpperCase() + monthName.substring(1);
-            buildBrandedHeader(document,
-                    "Bilan mensuel — " + capitalizedMonth + " " + year,
+
+            brandingHelper.buildBrandedHeader(document,
+                    "Bilan mensuel — " + capitalizedMonth + " " + report.getYear(),
                     null,
-                    "Généré le : " + LocalDateTime.now().format(DATE_FORMAT));
+                    "Généré le : " + report.getGeneratedAt().format(DATE_FORMAT)
+                        + (report.getGeneratedBy() != null ? "  —  par " + report.getGeneratedBy() : ""));
 
             addSectionTitle(document, "Statistiques du mois");
             Table statsTable = createInfoTable();
-            addRow(statsTable, "Total pannes", String.valueOf(monthFailures.size()));
-            addRow(statsTable, "Total interventions", String.valueOf(monthInterventions.size()));
-            addRow(statsTable, "MTTR moyen", avgMttr != null
-                    ? Math.round(avgMttr * 100.0) / 100.0 + " h" : "—");
+            addRow(statsTable, "Total pannes", String.valueOf(report.getTotalFailures()));
+            addRow(statsTable, "Total interventions", String.valueOf(report.getTotalInterventions()));
+            addRow(statsTable, "MTTR moyen", report.getAverageMttr() != null
+                    ? report.getAverageMttr() + " h" : "—");
             document.add(statsTable);
 
             addSectionTitle(document, "Top 3 équipements les plus défaillants");
-            if (top3.isEmpty()) {
-                document.add(new Paragraph("Aucune panne enregistrée ce mois-ci.")
-                        .setFontSize(10).setItalic().setFontColor(ColorConstants.GRAY));
-            } else {
-                Table topTable = new Table(UnitValue.createPercentArray(new float[]{30, 50, 20}))
-                        .useAllAvailableWidth().setMarginBottom(10);
-                topTable.addHeaderCell(headerCell("Code"));
-                topTable.addHeaderCell(headerCell("Équipement"));
-                topTable.addHeaderCell(headerCell("Nb pannes"));
+            document.add(new Paragraph(report.getTopEquipment() != null
+                    ? report.getTopEquipment() : "Aucune panne enregistrée ce mois-ci.")
+                    .setFontSize(10));
 
-                for (Map.Entry<Long, Long> entry : top3) {
-                    Equipment eq = equipmentById.get(entry.getKey());
-                    topTable.addCell(bodyCell(eq.getCode()));
-                    topTable.addCell(bodyCell(eq.getName()));
-                    topTable.addCell(bodyCell(String.valueOf(entry.getValue())));
-                }
-                document.add(topTable);
-            }
+            addSectionTitle(document, "Synthèse IA");
+            String summary = report.getLlmSummary();
+            document.add(new Paragraph(summary != null && !summary.isBlank() ? summary : "En cours d'analyse…")
+                    .setFontSize(10)
+                    .setFontColor(summary != null ? ColorConstants.BLACK : ColorConstants.GRAY)
+                    .setMarginBottom(10));
+
+            addSectionTitle(document, "Recommandations");
+            String recommendations = report.getRecommendations();
+            document.add(new Paragraph(recommendations != null && !recommendations.isBlank()
+                    ? recommendations : "En cours d'analyse…")
+                    .setFontSize(10)
+                    .setFontColor(recommendations != null ? ColorConstants.BLACK : ColorConstants.GRAY));
 
             buildFooter(document, pdfDoc);
         }
 
-        return baos.toByteArray();
+        return filePath;
     }
+
+    // ── Retourne les bytes du bilan mensuel (regénère si le fichier a disparu) ──
+    public byte[] getOrGenerateMonthlyReportBytes(MonthlyReport report) throws IOException {
+        if (report.getPdfPath() != null && new File(report.getPdfPath()).exists()) {
+            return Files.readAllBytes(Paths.get(report.getPdfPath()));
+        }
+        String pdfPath = generateMonthlyReportPdf(report);
+        return Files.readAllBytes(Paths.get(pdfPath));
+    }
+ 
     // ══════════════════════════════════════════════════════════
     // Fiche technique équipement
     // ══════════════════════════════════════════════════════════
@@ -518,7 +502,8 @@ public class PdfService {
                 .limit(10)
                 .toList();
 
-        Double avgMttr = interventionRepository.findAverageMttrByEquipment(equipmentId);
+        double periodHours = 90.0 * 24; // même fenêtre que l'historique des pannes affiché ci-dessous
+        Double mtbf = recentFailures.isEmpty() ? null : periodHours / recentFailures.size();
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (PdfWriter writer = new PdfWriter(baos);
@@ -557,8 +542,8 @@ public class PdfService {
                     ? equipment.getInstallationDate().toString() : null);
             addRow(stateTable, "Date de mise en service", equipment.getCommissioningDate() != null
                     ? equipment.getCommissioningDate().toString() : null);
-            addRow(stateTable, "MTTR moyen", avgMttr != null
-                    ? String.format("%.1f h", avgMttr) : "Non disponible");
+            addRow(stateTable, "MTBF (90 derniers jours)", mtbf != null
+                    ? String.format("%.1f h", mtbf) : "Non disponible (aucune panne sur la période)");
             document.add(stateTable);
 
             if (equipment.getDescription() != null && !equipment.getDescription().isBlank()) {

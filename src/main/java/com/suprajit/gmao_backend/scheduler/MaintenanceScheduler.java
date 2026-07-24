@@ -12,6 +12,7 @@ import com.suprajit.gmao_backend.entity.PreventiveMaintenance;
 import com.suprajit.gmao_backend.entity.enums.MaintenanceStatus;
 import com.suprajit.gmao_backend.notification.service.NotificationService;
 import com.suprajit.gmao_backend.repository.PreventiveMaintenanceRepository;
+import com.suprajit.gmao_backend.weeklyreport.service.MonthlyReportService;
 import com.suprajit.gmao_backend.weeklyreport.service.WeeklyReportService;
 
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class MaintenanceScheduler {
     private final NotificationService notificationService;
     private final WeeklyReportService weeklyReportService;
     private final AiAnalysisService aiAnalysisService;
+    private final MonthlyReportService monthlyReportService;
 
 
     // ── Tâche principale : chaque jour à 8h30 ───────────────
@@ -120,6 +122,21 @@ public class MaintenanceScheduler {
 
         // ── Déclenche la synthèse IA APRÈS que le rapport soit déjà commité ──
         aiAnalysisService.generateLlmSummary(report.getId());
+    }
+
+    // ── Clôture automatique du bilan mensuel : le 1er de chaque mois à 19h,
+    // génère le bilan du mois qui vient de se terminer ──
+    @Scheduled(cron = "0 0 19 1 * *")
+    @Transactional
+    public void generateMonthlyReportScheduled() {
+        java.time.LocalDate lastMonth = java.time.LocalDate.now().minusMonths(1);
+        int month = lastMonth.getMonthValue();
+        int year = lastMonth.getYear();
+
+        System.out.println("[SCHEDULER] Clôture du bilan mensuel " + month + "/" + year + "...");
+        var report = monthlyReportService.generateIfAbsent(month, year, "System");
+        aiAnalysisService.generateMonthlyLlmSummary(report.getId());
+        System.out.println("[SCHEDULER] Bilan mensuel " + month + "/" + year + " clôturé avec succès.");
     }
     
 }

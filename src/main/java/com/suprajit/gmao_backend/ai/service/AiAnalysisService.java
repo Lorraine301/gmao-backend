@@ -18,6 +18,7 @@ import com.suprajit.gmao_backend.ai.dto.AiAnalysisResponseDTO;
 import com.suprajit.gmao_backend.entity.AiAnalysis;
 import com.suprajit.gmao_backend.entity.Equipment;
 import com.suprajit.gmao_backend.entity.Failure;
+import com.suprajit.gmao_backend.entity.MonthlyReport;
 import com.suprajit.gmao_backend.entity.WeeklyReport;
 import com.suprajit.gmao_backend.entity.enums.AiAnalysisStatus;
 import com.suprajit.gmao_backend.entity.enums.FailurePriority;
@@ -25,6 +26,7 @@ import com.suprajit.gmao_backend.groq.service.GroqService;
 import com.suprajit.gmao_backend.pdf.service.PdfService;
 import com.suprajit.gmao_backend.repository.AiAnalysisRepository;
 import com.suprajit.gmao_backend.repository.FailureRepository;
+import com.suprajit.gmao_backend.repository.MonthlyReportRepository;
 import com.suprajit.gmao_backend.repository.WeeklyReportRepository;
 import com.suprajit.gmao_backend.ruleengine.dto.AtRiskEquipmentDTO;
 import com.suprajit.gmao_backend.ruleengine.service.RuleEngineService;
@@ -43,6 +45,7 @@ public class AiAnalysisService {
     private final WeeklyReportRepository weeklyReportRepository;
     private final PdfService pdfService;
     private final RuleEngineService ruleEngineService;
+    private final MonthlyReportRepository monthlyReportRepository;
 
     private static final int RECENT_FAILURES_WINDOW_DAYS = 7;
 
@@ -333,5 +336,52 @@ public class AiAnalysisService {
         );
 
         return groqService.callGroq(systemPrompt, userPrompt);
+    }
+
+    // ── Génère la synthèse IA + recommandations d'un bilan mensuel ──
+    @Async
+    @Transactional
+    public void generateMonthlyLlmSummary(Long monthlyReportId) {
+        MonthlyReport report = monthlyReportRepository.findById(monthlyReportId)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Bilan mensuel non trouvé : " + monthlyReportId));
+
+        try {
+            String systemPrompt = "Tu es un expert en maintenance industrielle. "
+                    + "Analyse les métriques mensuelles suivantes et retourne UNIQUEMENT un JSON valide "
+                    + "sans markdown avec les champs : summary (synthèse en 2-3 paragraphes) et "
+                    + "recommendations (liste de 3 à 5 recommandations concrètes en une seule chaîne)";
+
+            String userPrompt = String.format("""
+                    Bilan mensuel — Mois %d/%d :
+                    - Total pannes : %d
+                    - Total interventions : %d
+                    - MTTR moyen : %s
+                    - Top équipements défaillants : %s
+                    """,
+                    report.getMonth(), report.getYear(),
+                    report.getTotalFailures(), report.getTotalInterventions(),
+                    report.getAverageMttr() != null ? report.getAverageMttr() + " h" : "non disponible",
+                    report.getTopEquipment() != null ? report.getTopEquipment() : "aucun"
+            );
+
+            String rawResponse = groqService.callGroq(systemPrompt, userPrompt);
+            JsonNode json = parseJsonResponse(rawResponse);
+
+            report.setLlmSummary(json.path("summary").asText(null));
+            report.setRecommendations(json.path("recommendations").asText(null));
+            monthlyReportRepository.save(report);
+
+            try {
+                String pdfPath = pdfService.generateMonthlyReportPdf(report);
+                report.setPdfPath(pdfPath);
+                monthlyReportRepository.save(report);
+            } catch (Exception e) {
+                System.out.println("[AI SUMMARY] Synthèse mensuelle générée mais échec PDF : " + e.getMessage());
+            }
+
+        } catch (Exception e) {
+            System.out.println("[AI SUMMARY] Échec synthèse mensuelle " + monthlyReportId + " : " + e.getMessage());
+        }
     }
 }

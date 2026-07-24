@@ -38,14 +38,12 @@ public class EquipmentRequestDTO {
     @Size(max = 50)
     private String category;
 
-    @Size(max = 50)
+    @Size(max = 255, message = "L'adresse ne doit pas dépasser 255 caractères")
     private String plant;
 
     @Size(max = 50)
-    private String productionLine;
+    private String area;
 
-    @Size(max = 100)
-    private String location;
 
     private LocalDate installationDate;
     private LocalDate commissioningDate;
@@ -55,9 +53,6 @@ public class EquipmentRequestDTO {
 
     @NotNull(message = "Le niveau de criticité est obligatoire")
     private CriticalityLevel criticalityLevel;
-
-    @Size(max = 100)
-    private String maintenanceTeam;
 
     private String notes;
 }

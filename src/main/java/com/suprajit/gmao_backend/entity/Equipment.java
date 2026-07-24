@@ -62,14 +62,12 @@ public class Equipment {
     private String category;               // ex: Production, Support
 
     // ── Localisation ────────────────────────────────────────
-    @Column(length = 50)
+    @Column(length = 255)
     private String plant;                   // ex: Suprajit Morocco
 
-    @Column(name = "production_line", length = 50)
-    private String productionLine;          // ex: Line A
+    @Column(length = 50)
+    private String area;   // ex: Assemblage 1, Préparation 3
 
-    @Column(length = 100)
-    private String location;               // ex: Workshop A
 
     // ── Dates ───────────────────────────────────────────────
     @Column(name = "installation_date")
@@ -89,9 +87,6 @@ public class Equipment {
     @Builder.Default
     private CriticalityLevel criticalityLevel = CriticalityLevel.Medium;
 
-    // ── Maintenance ─────────────────────────────────────────
-    @Column(name = "maintenance_team", length = 100)
-    private String maintenanceTeam;        // ex: Mechanical Team
 
     @Column(columnDefinition = "TEXT")
     private String notes;

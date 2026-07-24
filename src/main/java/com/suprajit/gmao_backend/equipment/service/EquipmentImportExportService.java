@@ -7,7 +7,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DateUtil;
@@ -42,11 +41,13 @@ public class EquipmentImportExportService {
             .findAndRegisterModules(); // gère LocalDate correctement en JSON
 
     // ── Colonnes communes export/import (dans cet ordre précis) ──
+    // NOTE : location/productionLine/maintenanceTeam retirés,
+    // area ajouté (Zone → Area → Adresse usine)
     private static final String[] COLUMNS = {
             "code", "name", "description", "serialNumber", "manufacturer", "model",
-            "type", "category", "plant", "productionLine", "location",
+            "type", "category", "area", "plant",
             "installationDate", "commissioningDate", "status", "criticalityLevel",
-            "maintenanceTeam", "notes"
+            "notes"
     };
 
     // ══════════════════════════════════════════════════════════
@@ -68,7 +69,7 @@ public class EquipmentImportExportService {
 
             Row headerRow = sheet.createRow(0);
             for (int i = 0; i < COLUMNS.length; i++) {
-                Cell cell = headerRow.createCell(i);
+                org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
                 cell.setCellValue(COLUMNS[i]);
                 cell.setCellStyle(headerStyle);
             }
@@ -84,15 +85,13 @@ public class EquipmentImportExportService {
                 setCell(row, 5, eq.getModel());
                 setCell(row, 6, eq.getType());
                 setCell(row, 7, eq.getCategory());
-                setCell(row, 8, eq.getPlant());
-                setCell(row, 9, eq.getProductionLine());
-                setCell(row, 10, eq.getLocation());
-                setCell(row, 11, eq.getInstallationDate() != null ? eq.getInstallationDate().toString() : "");
-                setCell(row, 12, eq.getCommissioningDate() != null ? eq.getCommissioningDate().toString() : "");
-                setCell(row, 13, eq.getStatus() != null ? eq.getStatus().name() : "");
-                setCell(row, 14, eq.getCriticalityLevel() != null ? eq.getCriticalityLevel().name() : "");
-                setCell(row, 15, eq.getMaintenanceTeam());
-                setCell(row, 16, eq.getNotes());
+                setCell(row, 8, eq.getArea());
+                setCell(row, 9, eq.getPlant());
+                setCell(row, 10, eq.getInstallationDate() != null ? eq.getInstallationDate().toString() : "");
+                setCell(row, 11, eq.getCommissioningDate() != null ? eq.getCommissioningDate().toString() : "");
+                setCell(row, 12, eq.getStatus() != null ? eq.getStatus().name() : "");
+                setCell(row, 13, eq.getCriticalityLevel() != null ? eq.getCriticalityLevel().name() : "");
+                setCell(row, 14, eq.getNotes());
             }
 
             for (int i = 0; i < COLUMNS.length; i++) {
@@ -172,19 +171,17 @@ public class EquipmentImportExportService {
                     dto.setModel(getCellString(row, 5));
                     dto.setType(getCellString(row, 6));
                     dto.setCategory(getCellString(row, 7));
-                    dto.setPlant(getCellString(row, 8));
-                    dto.setProductionLine(getCellString(row, 9));
-                    dto.setLocation(getCellString(row, 10));
-                    dto.setInstallationDate(parseDate(getCellString(row, 11)));
-                    dto.setCommissioningDate(parseDate(getCellString(row, 12)));
-                    dto.setMaintenanceTeam(getCellString(row, 15));
-                    dto.setNotes(getCellString(row, 16));
+                    dto.setArea(getCellString(row, 8));
+                    dto.setPlant(getCellString(row, 9));
+                    dto.setInstallationDate(parseDate(getCellString(row, 10)));
+                    dto.setCommissioningDate(parseDate(getCellString(row, 11)));
+                    dto.setNotes(getCellString(row, 14));
 
-                    String statusStr = getCellString(row, 13);
+                    String statusStr = getCellString(row, 12);
                     dto.setStatus(statusStr != null && !statusStr.isBlank()
                             ? EquipmentStatus.valueOf(statusStr.trim()) : EquipmentStatus.Active);
 
-                    String criticalityStr = getCellString(row, 14);
+                    String criticalityStr = getCellString(row, 13);
                     dto.setCriticalityLevel(criticalityStr != null && !criticalityStr.isBlank()
                             ? CriticalityLevel.valueOf(criticalityStr.trim()) : CriticalityLevel.Medium);
 
@@ -192,11 +189,11 @@ public class EquipmentImportExportService {
                             .code(dto.getCode()).name(dto.getName()).description(dto.getDescription())
                             .serialNumber(dto.getSerialNumber()).manufacturer(dto.getManufacturer())
                             .model(dto.getModel()).type(dto.getType()).category(dto.getCategory())
-                            .plant(dto.getPlant()).productionLine(dto.getProductionLine())
-                            .location(dto.getLocation()).installationDate(dto.getInstallationDate())
+                            .area(dto.getArea()).plant(dto.getPlant())
+                            .installationDate(dto.getInstallationDate())
                             .commissioningDate(dto.getCommissioningDate()).status(dto.getStatus())
                             .criticalityLevel(dto.getCriticalityLevel())
-                            .maintenanceTeam(dto.getMaintenanceTeam()).notes(dto.getNotes())
+                            .notes(dto.getNotes())
                             .build();
 
                     equipmentRepository.save(entity);
@@ -246,11 +243,11 @@ public class EquipmentImportExportService {
                         .code(dto.getCode()).name(dto.getName()).description(dto.getDescription())
                         .serialNumber(dto.getSerialNumber()).manufacturer(dto.getManufacturer())
                         .model(dto.getModel()).type(dto.getType()).category(dto.getCategory())
-                        .plant(dto.getPlant()).productionLine(dto.getProductionLine())
-                        .location(dto.getLocation()).installationDate(dto.getInstallationDate())
+                        .area(dto.getArea()).plant(dto.getPlant())
+                        .installationDate(dto.getInstallationDate())
                         .commissioningDate(dto.getCommissioningDate()).status(dto.getStatus())
                         .criticalityLevel(dto.getCriticalityLevel())
-                        .maintenanceTeam(dto.getMaintenanceTeam()).notes(dto.getNotes())
+                        .notes(dto.getNotes())
                         .build();
 
                 equipmentRepository.save(entity);
@@ -268,7 +265,7 @@ public class EquipmentImportExportService {
 
     // ── Helpers ──────────────────────────────────────────────
     private String getCellString(Row row, int idx) {
-        Cell cell = row.getCell(idx);
+        org.apache.poi.ss.usermodel.Cell cell = row.getCell(idx);
         if (cell == null) return null;
         return switch (cell.getCellType()) {
             case STRING -> cell.getStringCellValue().trim();
@@ -290,7 +287,7 @@ public class EquipmentImportExportService {
 
     private boolean isRowEmpty(Row row) {
         for (int i = 0; i < COLUMNS.length; i++) {
-            Cell cell = row.getCell(i);
+            org.apache.poi.ss.usermodel.Cell cell = row.getCell(i);
             if (cell != null && cell.getCellType() != CellType.BLANK) return false;
         }
         return true;

@@ -33,13 +33,11 @@ public class EquipmentService {
                 .type(eq.getType())
                 .category(eq.getCategory())
                 .plant(eq.getPlant())
-                .productionLine(eq.getProductionLine())
-                .location(eq.getLocation())
+                .area(eq.getArea())
                 .installationDate(eq.getInstallationDate())
                 .commissioningDate(eq.getCommissioningDate())
                 .status(eq.getStatus())
                 .criticalityLevel(eq.getCriticalityLevel())
-                .maintenanceTeam(eq.getMaintenanceTeam())
                 .notes(eq.getNotes())
                 .createdAt(eq.getCreatedAt())
                 .updatedAt(eq.getUpdatedAt())
@@ -58,13 +56,11 @@ public class EquipmentService {
                 .type(dto.getType())
                 .category(dto.getCategory())
                 .plant(dto.getPlant())
-                .productionLine(dto.getProductionLine())
-                .location(dto.getLocation())
+                .area(dto.getArea())
                 .installationDate(dto.getInstallationDate())
                 .commissioningDate(dto.getCommissioningDate())
                 .status(dto.getStatus())
                 .criticalityLevel(dto.getCriticalityLevel())
-                .maintenanceTeam(dto.getMaintenanceTeam())
                 .notes(dto.getNotes())
                 .build();
     }
@@ -115,13 +111,11 @@ public class EquipmentService {
         existing.setType(dto.getType());
         existing.setCategory(dto.getCategory());
         existing.setPlant(dto.getPlant());
-        existing.setProductionLine(dto.getProductionLine());
-        existing.setLocation(dto.getLocation());
+        existing.setArea(dto.getArea());
         existing.setInstallationDate(dto.getInstallationDate());
         existing.setCommissioningDate(dto.getCommissioningDate());
         existing.setStatus(dto.getStatus());
         existing.setCriticalityLevel(dto.getCriticalityLevel());
-        existing.setMaintenanceTeam(dto.getMaintenanceTeam());
         existing.setNotes(dto.getNotes());
 
         return toDTO(equipmentRepository.save(existing));

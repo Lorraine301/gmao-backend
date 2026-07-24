@@ -22,13 +22,11 @@ public class EquipmentResponseDTO {
     private String type;
     private String category;
     private String plant;
-    private String productionLine;
-    private String location;
     private LocalDate installationDate;
     private LocalDate commissioningDate;
     private EquipmentStatus status;
     private CriticalityLevel criticalityLevel;
-    private String maintenanceTeam;
+    private String area;
     private String notes;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

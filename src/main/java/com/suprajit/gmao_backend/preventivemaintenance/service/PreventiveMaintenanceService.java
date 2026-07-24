@@ -50,7 +50,7 @@ public class PreventiveMaintenanceService {
                 .equipmentCode(pm.getEquipment().getCode())
                 .equipmentName(pm.getEquipment().getName())
                 .equipmentType(pm.getEquipment().getType())
-                .equipmentLocation(pm.getEquipment().getLocation())
+                .equipmentLocation(pm.getEquipment().getArea())
                 .maintenanceType(pm.getMaintenanceType())
                 .frequencyDays(pm.getFrequencyDays())
                 .lastMaintenanceDate(pm.getLastMaintenanceDate())

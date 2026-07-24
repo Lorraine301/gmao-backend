@@ -192,7 +192,9 @@ public class PdfService {
         addRow(table, "Code", failure.getEquipment().getCode());
         addRow(table, "Nom", failure.getEquipment().getName());
         addRow(table, "Type", failure.getEquipment().getType() != null ? failure.getEquipment().getType() : "—");
-        addRow(table, "Localisation", failure.getEquipment().getLocation() != null ? failure.getEquipment().getLocation() : "—");
+        addRow(table, "Zone", failure.getEquipment().getCategory() != null ? failure.getEquipment().getCategory() : "—");
+        addRow(table, "Area", failure.getEquipment().getArea() != null ? failure.getEquipment().getArea() : "—");
+        addRow(table, "Adresse usine", failure.getEquipment().getPlant() != null ? failure.getEquipment().getPlant() : "—");
         document.add(table);
     }
 
@@ -541,9 +543,9 @@ public class PdfService {
 
             addSectionTitle(document, "Localisation");
             Table locationTable = createInfoTable();
-            addRow(locationTable, "Site", equipment.getPlant());
-            addRow(locationTable, "Ligne de production", equipment.getProductionLine());
-            addRow(locationTable, "Emplacement", equipment.getLocation());
+            addRow(locationTable, "Zone", equipment.getCategory());
+            addRow(locationTable, "Area", equipment.getArea());
+            addRow(locationTable, "Adresse de l'usine", equipment.getPlant());
             document.add(locationTable);
 
             addSectionTitle(document, "État & Maintenance");
@@ -551,7 +553,6 @@ public class PdfService {
             addRow(stateTable, "Statut", equipment.getStatus() != null ? equipment.getStatus().name() : null);
             addRow(stateTable, "Criticité", equipment.getCriticalityLevel() != null
                     ? equipment.getCriticalityLevel().name() : null);
-            addRow(stateTable, "Équipe de maintenance", equipment.getMaintenanceTeam());
             addRow(stateTable, "Date d'installation", equipment.getInstallationDate() != null
                     ? equipment.getInstallationDate().toString() : null);
             addRow(stateTable, "Date de mise en service", equipment.getCommissioningDate() != null

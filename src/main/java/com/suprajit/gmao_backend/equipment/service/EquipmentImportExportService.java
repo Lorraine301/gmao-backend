@@ -5,8 +5,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DateUtil;
@@ -140,15 +143,33 @@ public class EquipmentImportExportService {
         try (Workbook workbook = WorkbookFactory.create(inputStream)) {
             Sheet sheet = workbook.getSheetAt(0);
 
+            // ── Lit la ligne d'en-tête et associe chaque nom de colonne à son index ──
+            Row headerRow = sheet.getRow(0);
+            if (headerRow == null) {
+                throw new IllegalArgumentException("Le fichier est vide ou ne contient pas d'en-tête.");
+            }
+
+            Map<String, Integer> columnIndex = new HashMap<>();
+            for (Cell cell : headerRow) {
+                String headerName = cell.getStringCellValue().trim();
+                columnIndex.put(headerName, cell.getColumnIndex());
+            }
+
+            // ── Vérifie que les colonnes obligatoires sont bien présentes ──
+            if (!columnIndex.containsKey("code") || !columnIndex.containsKey("name")) {
+                throw new IllegalArgumentException(
+                        "Le fichier doit contenir au minimum les colonnes 'code' et 'name'.");
+            }
+
             for (int rowIdx = 1; rowIdx <= sheet.getLastRowNum(); rowIdx++) {
                 Row row = sheet.getRow(rowIdx);
-                if (row == null || isRowEmpty(row)) continue;
+                if (row == null || isRowEmpty(row, columnIndex)) continue;
 
-                int excelRowNumber = rowIdx + 1; // pour un message d'erreur lisible (1-indexé Excel)
+                int excelRowNumber = rowIdx + 1;
 
                 try {
-                    String code = getCellString(row, 0);
-                    String name = getCellString(row, 1);
+                    String code = getCellString(row, columnIndex, "code");
+                    String name = getCellString(row, columnIndex, "name");
 
                     if (code == null || code.isBlank() || name == null || name.isBlank()) {
                         errors.add("Ligne " + excelRowNumber + " : code ou nom manquant, ignorée");
@@ -165,23 +186,23 @@ public class EquipmentImportExportService {
                     EquipmentRequestDTO dto = new EquipmentRequestDTO();
                     dto.setCode(code);
                     dto.setName(name);
-                    dto.setDescription(getCellString(row, 2));
-                    dto.setSerialNumber(getCellString(row, 3));
-                    dto.setManufacturer(getCellString(row, 4));
-                    dto.setModel(getCellString(row, 5));
-                    dto.setType(getCellString(row, 6));
-                    dto.setCategory(getCellString(row, 7));
-                    dto.setArea(getCellString(row, 8));
-                    dto.setPlant(getCellString(row, 9));
-                    dto.setInstallationDate(parseDate(getCellString(row, 10)));
-                    dto.setCommissioningDate(parseDate(getCellString(row, 11)));
-                    dto.setNotes(getCellString(row, 14));
+                    dto.setDescription(getCellString(row, columnIndex, "description"));
+                    dto.setSerialNumber(getCellString(row, columnIndex, "serialNumber"));
+                    dto.setManufacturer(getCellString(row, columnIndex, "manufacturer"));
+                    dto.setModel(getCellString(row, columnIndex, "model"));
+                    dto.setType(getCellString(row, columnIndex, "type"));
+                    dto.setCategory(getCellString(row, columnIndex, "category"));
+                    dto.setArea(getCellString(row, columnIndex, "area"));
+                    dto.setPlant(getCellString(row, columnIndex, "plant"));
+                    dto.setInstallationDate(parseDate(getCellString(row, columnIndex, "installationDate")));
+                    dto.setCommissioningDate(parseDate(getCellString(row, columnIndex, "commissioningDate")));
+                    dto.setNotes(getCellString(row, columnIndex, "notes"));
 
-                    String statusStr = getCellString(row, 12);
+                    String statusStr = getCellString(row, columnIndex, "status");
                     dto.setStatus(statusStr != null && !statusStr.isBlank()
                             ? EquipmentStatus.valueOf(statusStr.trim()) : EquipmentStatus.Active);
 
-                    String criticalityStr = getCellString(row, 13);
+                    String criticalityStr = getCellString(row, columnIndex, "criticalityLevel");
                     dto.setCriticalityLevel(criticalityStr != null && !criticalityStr.isBlank()
                             ? CriticalityLevel.valueOf(criticalityStr.trim()) : CriticalityLevel.Medium);
 
@@ -211,6 +232,30 @@ public class EquipmentImportExportService {
 
         return EquipmentImportResultDTO.builder()
                 .createdCount(created).skippedCount(skipped).errors(errors).build();
+    }
+
+    // ── Récupère la valeur d'une cellule par NOM de colonne (pas par position) ──
+    private String getCellString(Row row, Map<String, Integer> columnIndex, String columnName) {
+        Integer idx = columnIndex.get(columnName);
+        if (idx == null) return null; // colonne absente du fichier → traité comme vide
+
+        Cell cell = row.getCell(idx);
+        if (cell == null) return null;
+        return switch (cell.getCellType()) {
+            case STRING -> cell.getStringCellValue().trim();
+            case NUMERIC -> DateUtil.isCellDateFormatted(cell)
+                    ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
+                    : String.valueOf((long) cell.getNumericCellValue());
+            default -> null;
+        };
+    }
+
+    private boolean isRowEmpty(Row row, Map<String, Integer> columnIndex) {
+        for (Integer idx : columnIndex.values()) {
+            Cell cell = row.getCell(idx);
+            if (cell != null && cell.getCellType() != CellType.BLANK) return false;
+        }
+        return true;
     }
 
     private EquipmentImportResultDTO importFromJson(InputStream inputStream) throws IOException {
@@ -264,18 +309,7 @@ public class EquipmentImportExportService {
     }
 
     // ── Helpers ──────────────────────────────────────────────
-    private String getCellString(Row row, int idx) {
-        org.apache.poi.ss.usermodel.Cell cell = row.getCell(idx);
-        if (cell == null) return null;
-        return switch (cell.getCellType()) {
-            case STRING -> cell.getStringCellValue().trim();
-            case NUMERIC -> DateUtil.isCellDateFormatted(cell)
-                    ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
-                    : String.valueOf((long) cell.getNumericCellValue());
-            default -> null;
-        };
-    }
-
+  
     private LocalDate parseDate(String value) {
         if (value == null || value.isBlank()) return null;
         try {
@@ -283,13 +317,5 @@ public class EquipmentImportExportService {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    private boolean isRowEmpty(Row row) {
-        for (int i = 0; i < COLUMNS.length; i++) {
-            org.apache.poi.ss.usermodel.Cell cell = row.getCell(i);
-            if (cell != null && cell.getCellType() != CellType.BLANK) return false;
-        }
-        return true;
     }
 }

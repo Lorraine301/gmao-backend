@@ -66,5 +66,15 @@ public class AuthService {
 
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
         userRepository.save(user);
-    }           
+    }  
+       
+    // ── Le technicien change sa propre disponibilité ──────────
+    public void updateMyAvailability(String availabilityStatus) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("Utilisateur non trouvé"));
+
+        user.setAvailabilityStatus(availabilityStatus);
+        userRepository.save(user);
+    }
 }

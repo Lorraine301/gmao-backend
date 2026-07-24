@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.suprajit.gmao_backend.auth.dto.ChangePasswordDTO;
 import com.suprajit.gmao_backend.auth.dto.LoginRequest;
 import com.suprajit.gmao_backend.auth.dto.LoginResponse;
+import com.suprajit.gmao_backend.auth.dto.UpdateAvailabilityDTO;
 import com.suprajit.gmao_backend.auth.dto.UserProfileResponse;
 import com.suprajit.gmao_backend.auth.service.AuthService;
 import com.suprajit.gmao_backend.entity.User;
@@ -97,5 +98,11 @@ public class AuthController {
     public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordDTO dto) {
         authService.changePassword(dto);
         return ResponseEntity.noContent().build();
-    }   
+    } 
+    @Operation(summary = "Changer ma propre disponibilité", description = "Réservé au technicien connecté.")
+    @PutMapping("/me/availability")
+    public ResponseEntity<Void> updateMyAvailability(@Valid @RequestBody UpdateAvailabilityDTO dto) {
+        authService.updateMyAvailability(dto.getAvailabilityStatus());
+        return ResponseEntity.noContent().build();
+    }  
 }

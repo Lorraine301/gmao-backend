@@ -43,11 +43,15 @@ public class UserController {
     @Transactional
     public ResponseEntity<List<TechnicianDto>> getTechnicians() {
         List<TechnicianDto> result = userRepository
-                .findByRole_NameAndAvailabilityStatus("Technician", "Available")
+                .findByRole_NameIn(List.of("Technician"))
                 .stream()
                 .map(u -> new TechnicianDto(
-                        u.getId(), u.getFullName(), u.getEmail(), u.getEmployeeCode(),
-                        u.getSpeciality(), u.getAvailabilityStatus()
+                        u.getId(),
+                        u.getFullName(),
+                        u.getEmail(),
+                        u.getEmployeeCode(),
+                        u.getSpeciality(),
+                        u.getAvailabilityStatus()
                 ))
                 .toList();
         return ResponseEntity.ok(result);
